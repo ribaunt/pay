@@ -1,0 +1,175 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "linux-arm64-openssl-1.1.x", "linux-arm64-openssl-3.0.x", "linux-musl", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  name         String?
+  passwordHash    String   @default("")
+  sessionVersion  Int      @default(0)
+  isAnonymous     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  wallet       Wallet?
+}
+
+model ApiKey {
+  id          String           @id @default(cuid())
+  name        String
+  keyHash     String           @unique
+  prefix      String
+  scopes      String           @default("*")
+  createdAt   DateTime         @default(now())
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+  links       PaymentRequest[]
+  webhooks    WebhookEndpoint[]
+}
+
+model WebhookEndpoint {
+  id         String            @id @default(cuid())
+  url        String
+  secret     String
+  events     String            @default("*")
+  enabled    Boolean           @default(true)
+  apiKeyId   String?
+  apiKey     ApiKey?           @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  createdAt  DateTime          @default(now())
+  deliveries WebhookDelivery[]
+}
+
+model WebhookDelivery {
+  id         String          @id @default(cuid())
+  endpointId String
+  endpoint   WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event      String
+  payload    String
+  status     String          @default("pending")
+  attempts   Int             @default(0)
+  nextRetryAt DateTime?
+  lastStatus Int?
+  error      String?
+  createdAt  DateTime        @default(now())
+  deliveredAt DateTime?
+
+  @@index([status, nextRetryAt])
+}
+
+model Wallet {
+  id            String           @id @default(cuid())
+  name          String           @unique
+  walletFile    String
+  address       String
+  viewKey       String?
+  restoreHeight Int?
+  isWatchOnly   Boolean          @default(false)
+  description   String?
+  userId        String           @unique
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  payments      PaymentRequest[]
+  addresses     Subaddress[]
+  proofs        PaymentProof[]
+}
+
+model Subaddress {
+  id            String   @id @default(cuid())
+  walletId      String
+  wallet        Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  address       String
+  addressIndex  Int
+  label         String?
+  used          Boolean   @default(false)
+  lastUsedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@unique([walletId, addressIndex])
+  @@index([walletId])
+}
+
+model PaymentRequest {
+  id              String    @id @default(cuid())
+  walletId        String
+  wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  address         String
+  amount          String
+  uri             String
+  label           String?
+  status          String    @default("pending")
+  createdAt       DateTime  @default(now())
+
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  cancelledAt     DateTime?
+  lateDetectedAt  DateTime?
+  txHash          String?
+  confirmations   Int       @default(0)
+  publicTokenHash String?   @unique
+
+  fiatAmount      String?
+  fiatCurrency    String?
+  rateUsd         String?
+  fxRate          String?
+  rateSources     String?
+  rateFetchedAt   DateTime?
+  rateStale       Boolean   @default(false)
+  rateDegraded    Boolean   @default(false)
+
+  apiKeyId             String?
+  apiKey               ApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  idempotencyKeyHash   String?
+  requestHash          String?
+  responseSnapshot     String?
+  idempotencyExpiresAt DateTime?
+  requiredConfirmations Int?
+  receivedAtomic       String?
+  renewedFromId        String?
+
+  transfers PaymentRequestTransfer[]
+
+  @@unique([apiKeyId, idempotencyKeyHash])
+  @@index([walletId, status])
+  @@index([status, expiresAt])
+}
+
+model PaymentRequestTransfer {
+  id               String        @id @default(cuid())
+  paymentRequestId String
+  paymentRequest   PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+  txid             String
+  amount           String
+  blockHeight      Int
+  createdAt        DateTime      @default(now())
+
+  @@unique([paymentRequestId, txid])
+}
+
+model RateLimitBucket {
+  key      String   @id
+  count    Int      @default(0)
+  resetAt  DateTime
+  createdAt DateTime @default(now())
+}
+
+model PaymentProof {
+  id        String   @id @default(cuid())
+  walletId  String
+  wallet    Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  txHash    String
+  address   String
+  message   String  @default("")
+  signature String
+  createdAt DateTime @default(now())
+
+  @@unique([walletId, txHash, address, message])
+  @@index([walletId])
+}
