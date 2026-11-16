@@ -1,0 +1,6 @@
+# No open SOCKS proxy — this container only publishes a hidden service.
+SocksPort 0
+Log notice stdout
+
+HiddenServiceDir /var/lib/tor/hidden_service
+HiddenServicePort 80 app:3000
