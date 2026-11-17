@@ -1,0 +1,5 @@
+SocksPort 0
+Log notice stdout
+
+HiddenServiceDir /var/lib/tor/hidden_service
+HiddenServicePort 80 app-onion:3000
