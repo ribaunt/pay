@@ -1,0 +1,72 @@
+# Monero wallet RPC daemon image.
+# Uses the official prebuilt Monero CLI release, verified against the
+# GPG-signed hash list published by the Monero workgroup.
+FROM debian@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+
+ARG MONERO_VERSION=v0.18.5.4
+ARG MONERO_SHA256_X64=ba2928962c101b609434bf8c1b43ad59ebe96c5525977284ca599d8bf0f02d10
+ARG MONERO_SHA256_ARM64=d20d71e6522b41eb8e549c3425f7f4622c9c9a448fc7147525393fd0a6b59703
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl bzip2 libssl3 gnupg \
+ && rm -rf /var/lib/apt/lists/*
+
+# Import the Monero release keys (fingerprints pinned) and verify the signed hash list.
+RUN export GNUPGHOME=/tmp/gnupg \
+ && mkdir -m 700 "$GNUPGHOME" \
+ && curl -fsSL https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc \
+    | gpg --batch --import \
+ && curl -fsSL https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/luigi1111.asc \
+    | gpg --batch --import \
+ && printf '%s\n' \
+    '81AC591FE9C4B65C5806AFC3F0AF4D462A0BDF92:6:' \
+    '8777AB8F778EE89487A2F8E7F4ACA0183641E010:6:' \
+    | gpg --batch --import-ownertrust \
+ && curl -fsSL -o /tmp/hashes.txt https://www.getmonero.org/downloads/hashes.txt \
+ && curl -fsSL -o /tmp/hashes.txt.sig https://www.getmonero.org/downloads/hashes.txt.sig \
+ && gpg --batch --verify /tmp/hashes.txt.sig /tmp/hashes.txt
+
+# Pick the correct official prebuilt for the target architecture and verify
+# it against both the signed list and the pinned SHA-256 constant above.
+RUN ARCH="$(uname -m)"; \
+    case "${ARCH}" in \
+      x86_64) \
+        URL="https://downloads.getmonero.org/cli/linux64"; \
+        FILE="monero-linux-x64-${MONERO_VERSION}.tar.bz2"; \
+        EXPECTED="${MONERO_SHA256_X64}" ;; \
+      aarch64) \
+        URL="https://downloads.getmonero.org/cli/linuxarm8"; \
+        FILE="monero-linux-armv8-${MONERO_VERSION}.tar.bz2"; \
+        EXPECTED="${MONERO_SHA256_ARM64}" ;; \
+      *) echo "Unsupported architecture: ${ARCH}" >&2; exit 1 ;; \
+    esac; \
+    grep -q "${EXPECTED}  ${FILE}" /tmp/hashes.txt || { echo "Pinned hash not in signed hash list" >&2; exit 1; }; \
+    curl -fsSL -o /tmp/monero.tar.bz2 "${URL}" \
+ && echo "${EXPECTED}  /tmp/monero.tar.bz2" | sha256sum -c - \
+ && mkdir -p /opt/monero \
+ && tar -xjf /tmp/monero.tar.bz2 -C /opt/monero --strip-components=1 \
+ && rm -f /tmp/monero.tar.bz2 /tmp/hashes.txt /tmp/hashes.txt.sig \
+ && find /opt/monero -maxdepth 1 -type f ! -name monero-wallet-rpc -delete \
+ && chmod +x /opt/monero/monero-wallet-rpc
+
+ENV PATH="/opt/monero:${PATH}"
+RUN addgroup --system --gid 10001 monero \
+ && adduser --system --uid 10001 --ingroup monero monero \
+ && mkdir -p /data/wallets \
+ && chown -R monero:monero /data
+WORKDIR /data
+VOLUME ["/data"]
+
+EXPOSE 18082
+
+# Point this at a node you control. No monerod is bundled in this image.
+# MONERO_NETWORK selects mainnet or stagenet. The entrypoint refuses unknown
+# values and picks a network-appropriate default daemon.
+ENV MONERO_NETWORK=mainnet
+
+COPY scripts/wallet-entrypoint.sh /usr/local/bin/wallet-entrypoint.sh
+RUN chmod +x /usr/local/bin/wallet-entrypoint.sh
+
+# MONERO_RPC_USER / MONERO_RPC_PASSWORD must be supplied at runtime.
+USER monero
+ENTRYPOINT ["/usr/local/bin/wallet-entrypoint.sh"]
