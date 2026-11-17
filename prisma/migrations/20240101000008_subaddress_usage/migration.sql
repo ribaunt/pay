@@ -1,0 +1,3 @@
+ALTER TABLE "Subaddress"
+  ADD COLUMN "used" BOOLEAN NOT NULL DEFAULT false,
+  ADD COLUMN "lastUsedAt" TIMESTAMP(3);
