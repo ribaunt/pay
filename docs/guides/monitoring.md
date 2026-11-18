@@ -6,13 +6,15 @@ icon: lucide/activity
 
 Ribaunt Pay exposes a health endpoint and a Prometheus metrics endpoint. No external monitoring service is bundled.
 
+For a full setup, see the [Prometheus](prometheus.md) and [Grafana](grafana.md) guides.
+
 ## Health
 
 ```bash
 curl -fsS https://pay.example.com/api/health
 ```
 
-The endpoint is public and returns `200` when everything is reachable, `503` when it is not.
+The endpoint is public and returns `200` when everything is reachable, `503` when it's not.
 
 ```json
 {
@@ -99,6 +101,6 @@ Load the file into Prometheus via `rule_files`, or adapt the expressions for you
 ## Things worth watching
 
 - **Settlement heartbeat.** If `POST /api/cron/payment-links` stops running, links stay `pending` forever even though customers have paid. Alert on the absence of status transitions, not just on errors.
-- **Sync lag.** A wallet that is far behind the daemon can miss recent transfers.
+- **Sync lag.** A wallet that's far behind the daemon can miss recent transfers.
 - **Webhook dead letters.** Deliveries that reach six attempts are marked `dead` and need manual replay or inspection.
 - **Price degradation.** Fewer than two sources means quotes are less trustworthy; links still get created with a locked rate.

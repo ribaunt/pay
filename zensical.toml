@@ -1,7 +1,7 @@
 [project]
 site_name = "Ribaunt Pay"
 site_url = "https://pay.ribaunt.com/"
-site_description = "Documentation for Ribaunt Pay — a self-hosted, privacy-first Monero payment server with watch-only wallets, expiring payment links and signed webhooks."
+site_description = "Documentation for Ribaunt Pay, a self-hosted and privacy-first Monero payment server with watch-only wallets, expiring payment links and signed webhooks."
 site_author = "Ribaunt"
 copyright = "&copy; 2026 Ribaunt &middot; Made with Zensical"
 repo_url = "https://github.com/ribaunt/pay"
@@ -30,6 +30,8 @@ nav = [
     { "Backups" = "guides/backups.md" },
     { "Tor and I2P" = "guides/tor-and-i2p.md" },
     { "Monitoring" = "guides/monitoring.md" },
+    { "Prometheus" = "guides/prometheus.md" },
+    { "Grafana" = "guides/grafana.md" },
     { "Releases" = "guides/releases.md" },
     { "Development" = "guides/development.md" },
   ] },
