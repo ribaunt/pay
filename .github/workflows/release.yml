@@ -100,7 +100,10 @@ jobs:
             org.opencontainers.image.version=${{ steps.version.outputs.value }}
             org.opencontainers.image.revision=${{ github.sha }}
 
+      # Package visibility may be locked by org policy. If this API is not
+      # available, an owner must set the packages to public in GitHub settings.
       - name: Publish package publicly
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
