@@ -5,6 +5,7 @@ import { getWalletHeight } from "@/lib/monero/wallet";
 import { getDaemonHeight } from "@/lib/monero/daemon";
 import { getPaymentConfig } from "@/lib/config";
 import { setGauge } from "@/lib/metrics";
+import { collectBusinessMetrics } from "@/lib/business-metrics";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export async function GET() {
   setGauge("pay_wallet_height", walletHeight);
   setGauge("pay_daemon_height", daemonHeight);
   setGauge("pay_wallet_sync_lag_blocks", syncLag);
+  await collectBusinessMetrics();
 
   const healthy = db && walletRpc && daemon;
 
