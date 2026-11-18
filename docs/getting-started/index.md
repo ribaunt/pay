@@ -41,8 +41,8 @@ The fastest path is the [quickstart](quickstart.md). If you want to understand e
 You need three things:
 
 1. **Docker with the Compose plugin.** The app image, the wallet RPC image, and PostgreSQL all run as containers.
-2. **A Monero node you control or trust.** The stack does not ship `monerod`; scanning happens locally in watch-only mode.
-3. **A wallet's primary address and private view key.** You do not need the spend key, and you should never provide it.
+2. **A Monero node you control or trust.** The stack doesn't ship `monerod`; scanning happens locally in watch-only mode.
+3. **A wallet's primary address and private view key.** You don't need the spend key, and you should never provide it.
 
 !!! warning "Use a dedicated wallet"
     Point Ribaunt Pay at a wallet used for receiving payments. The server creates subaddresses and stores payment metadata; keeping your personal spending wallet separate makes bookkeeping and privacy easier.
@@ -55,4 +55,4 @@ You need three things:
                          →  postgres :5432
 ```
 
-After the stack is healthy, you sign in once with the credentials from `.env`, visit `/setup`, and paste the address and view key. Everything else — creating links, watching payments, delivering webhooks — happens through the API.
+After the stack is healthy, you sign in once with the credentials from `.env`, visit `/setup`, and paste the address and view key. You do everything else through the API: creating links, watching payments, and delivering webhooks.

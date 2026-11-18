@@ -8,7 +8,7 @@ Server-to-server calls use API keys. Keys are scoped, revocable, and stored only
 
 ## The bootstrap key
 
-`PAYMENT_API_KEY` in `.env` works immediately. The first time it is used, the app creates a key record named `bootstrap-env-key` with scopes `payment:write,payment:read`. The plaintext key is never stored.
+`PAYMENT_API_KEY` in `.env` works immediately. The first time it's used, the app creates a key record named `bootstrap-env-key` with scopes `payment:write,payment:read`. The plaintext key is never stored.
 
 ```bash
 curl https://pay.example.com/api/payment-links \
@@ -41,7 +41,7 @@ curl -X POST https://pay.example.com/api/admin/api-keys \
 }
 ```
 
-The `secret` is returned once. `prefix` is what you will see in listings later. Names may be up to 80 characters; scopes may contain lowercase letters, colons, commas, and spaces.
+The `secret` is returned once. `prefix` is what you'll see in listings later. Names may be up to 80 characters; scopes may contain lowercase letters, colons, commas, and spaces.
 
 ## Scopes
 
@@ -53,7 +53,7 @@ The `secret` is returned once. `prefix` is what you will see in listings later. 
 | `webhook:write` | Register webhook endpoints. |
 | `metrics:read` | Scrape Prometheus metrics. |
 
-A scope string of `*` means everything. A key with the wrong scope gets `401`, the same as an unknown key. The cron endpoints do not use API keys — they use `x-cron-secret`.
+A scope string of `*` means everything. A key with the wrong scope gets `401`, the same as an unknown key. Cron endpoints use `x-cron-secret` instead of API keys.
 
 ## List and revoke
 
@@ -62,7 +62,7 @@ curl https://pay.example.com/api/admin/api-keys \
   -b 'pay_session=<session-token>'
 ```
 
-The listing includes `id`, `name`, `prefix`, `scopes`, `createdAt`, `expiresAt`, `revokedAt`, and `lastUsedAt` — but no key hash or secret.
+The listing includes `id`, `name`, `prefix`, `scopes`, `createdAt`, `expiresAt`, `revokedAt`, and `lastUsedAt`, but no key hash or secret.
 
 ```bash
 curl -X POST https://pay.example.com/api/admin/api-keys/<id>/revoke \
@@ -75,7 +75,7 @@ Revocation sets `revokedAt`. The key stops working immediately, even if its valu
 
 - Keys have no built-in expiry through the API; set `expiresAt` in the database if you need one.
 - Successful verification updates `lastUsedAt` in the background.
-- Rate limits for API-key calls are keyed by key ID, so one integration cannot exhaust another's budget.
-- Client IP addresses are not stored for authenticated API calls, and `X-Forwarded-For` is ignored unless `TRUST_PROXY=1`.
+- Rate limits for API-key calls are keyed by key ID, so one integration can't exhaust another's budget.
+- Client IP addresses aren't stored for authenticated API calls, and `X-Forwarded-For` is ignored unless `TRUST_PROXY=1`.
 
 The full shapes are in the [Admin and metrics reference](../api/admin-and-metrics.md).

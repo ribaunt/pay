@@ -36,7 +36,7 @@ sh scripts/i2p-address.sh
 This starts an `i2pd` container with a tunnel configured in `i2pd/tunnels.conf`, again with no clearnet ports. Health reports `accessMode: i2p`.
 
 !!! note "Separate data volumes"
-    Each privacy profile uses its own database and wallet volumes (`postgres_data_onion`, `wallet_data_onion`, `postgres_data_i2p`, `wallet_data_i2p`). Switching profiles does not reuse the clearnet wallet. Import your view key again, or copy and restore the data deliberately.
+    Each privacy profile uses its own database and wallet volumes (`postgres_data_onion`, `wallet_data_onion`, `postgres_data_i2p`, `wallet_data_i2p`). Switching profiles doesn't reuse the clearnet wallet. Import your view key again, or copy and restore the data deliberately.
 
 ## Route the Monero daemon through Tor
 
@@ -47,7 +47,7 @@ MONERO_DAEMON_PROXY=127.0.0.1:9050
 MONERO_DAEMON_ADDRESS=your-node.example.com:18081
 ```
 
-`MONERO_DAEMON_PROXY` controls traffic from the app to the daemon. Health reports it as `proxy: socks5`. The view key is never sent to the daemon in any mode — `MONERO_DAEMON_MODE` must be `full-scan`.
+`MONERO_DAEMON_PROXY` controls traffic from the app to the daemon. Health reports it as `proxy: socks5`. The view key is never sent to the daemon in any mode, and `MONERO_DAEMON_MODE` must be `full-scan`.
 
 If the proxy runs in the same Compose network, use its service name and port instead of `127.0.0.1`.
 
@@ -65,6 +65,6 @@ The health check tries the primary address first, then each fallback in order. A
 curl -fsS http://localhost:3000/api/health
 ```
 
-For onion-only and I2P-only stacks there is no localhost port — run the health request from another container on the same Compose network, or through the onion/I2P address.
+Onion-only and I2P-only stacks have no localhost port. Run the health request from another container on the same Compose network, or through the onion/I2P address.
 
 Check that `remoteNode.viewKeySentToDaemon` is `false` and `lightWallet` is `false`. Those fields exist to make a privacy regression obvious at a glance.

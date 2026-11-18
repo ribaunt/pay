@@ -41,11 +41,11 @@ Wallet files are encrypted with `MONERO_WALLET_PASSWORD` and live in a dedicated
 
 ## Verified binaries
 
-`Dockerfile.wallet` pins Monero v0.18.5.4 and its SHA-256 hashes, imports the release signing keys with pinned fingerprints, verifies the GPG-signed `hashes.txt`, and checks the downloaded tarball hash before extraction. It then deletes everything except `monero-wallet-rpc` — notably `monerod`, which means the container cannot silently become a public node.
+`Dockerfile.wallet` pins Monero v0.18.5.4 and its SHA-256 hashes, imports the release signing keys with pinned fingerprints, verifies the GPG-signed `hashes.txt`, and checks the downloaded tarball hash before extraction. It then deletes everything except `monero-wallet-rpc`. That includes `monerod`, so the container can't silently become a public node.
 
 ## Accounts and access
 
-There is exactly one account, defined by `SINGLE_USER_EMAIL` and `SINGLE_USER_PASSWORD` in `.env`. There is no `/api/auth/register` and no anonymous session. Sessions are HMAC-signed, HTTP-only, SameSite=Lax, and Secure in production. Logging out increments the user's session version, which invalidates every older cookie.
+There's exactly one account, defined by `SINGLE_USER_EMAIL` and `SINGLE_USER_PASSWORD` in `.env`. There's no `/api/auth/register` and no anonymous session. Sessions are HMAC-signed, HTTP-only, SameSite=Lax, and Secure in production. Logging out increments the user's session version, which invalidates every older cookie.
 
 Server-to-server access uses scoped API keys. The bootstrap key in `.env` is stored as a hash on first use, and each additional key can be revoked independently. Cron endpoints use a separate shared secret.
 
@@ -68,7 +68,7 @@ TLS and reverse proxying are deliberately left to the deployment environment. Th
 
 CI generates SPDX SBOMs with Syft and signs them with cosign, with pinned tool versions and verified download hashes.
 
-## What privacy does not mean
+## What privacy doesn't mean
 
 - A watch-only wallet still reveals incoming amounts and history to whoever holds the view key.
 - Payment metadata lives in your PostgreSQL instance; anyone with database access can read it.

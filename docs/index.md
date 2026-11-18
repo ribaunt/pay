@@ -9,7 +9,7 @@ hide:
 
 **Ribaunt Pay** is a small, self-hosted server for accepting Monero. You give it a watch-only wallet, it generates a fresh address for every payment, watches the chain, and tells your application when a payment is confirmed. It has no sign-ups, no analytics, and no spend keys.
 
-It runs as a Docker Compose stack: a Next.js app, PostgreSQL, and `monero-wallet-rpc`. You point it at a Monero node you trust — no `monerod` is bundled.
+It runs as a Docker Compose stack: a Next.js app, PostgreSQL, and `monero-wallet-rpc`. You point it at a Monero node you trust. No `monerod` is bundled.
 
 <div class="grid cards" markdown>
 
@@ -20,14 +20,6 @@ It runs as a Docker Compose stack: a Next.js app, PostgreSQL, and `monero-wallet
     Set up a stack, add your view key, and create your first payment link in a few minutes.
 
     [Quickstart](getting-started/quickstart.md)
-
--   :lucide-shield-check:{ .lg .middle } __Stay private__
-
-    ---
-
-    Full-scan remote node mode, encrypted view keys, and no IP addresses stored for API calls.
-
-    [Privacy model](architecture/privacy-model.md)
 
 -   :lucide-credit-card:{ .lg .middle } __Accept payments__
 
@@ -51,7 +43,7 @@ It runs as a Docker Compose stack: a Next.js app, PostgreSQL, and `monero-wallet
 
 1. Your backend creates a link with an amount and an optional expiry.
 2. Ribaunt Pay generates a fresh subaddress and locks in the exchange rate if the price is fiat.
-3. The customer sends XMR to that address. There is no account or checkout session to create.
+3. The customer sends XMR to that address. There's no account or checkout session to create.
 4. A scheduled job detects the transfer, tracks confirmations, and emits webhooks as the status changes.
 5. Your app checks the status with a secret token, or listens for `payment.confirmed`.
 
@@ -80,10 +72,10 @@ flowchart LR
 
 ## Where to go next
 
-- [Install and configure](getting-started/installation.md) — prerequisites, `.env`, and Compose profiles.
-- [Set up a wallet](guides/watch-only-wallet.md) — what a view key can and cannot do.
-- [Read the API overview](api/index.md) — authentication, rate limits, and error format.
-- [Explore the data model](architecture/data-model.md) — the types behind the endpoints.
+- [Install and configure](getting-started/installation.md): prerequisites, `.env`, and Compose profiles.
+- [Set up a wallet](guides/watch-only-wallet.md): what a view key can and can't do.
+- [Read the API overview](api/index.md): authentication, rate limits, and error format.
+- [Explore the data model](architecture/data-model.md): the types behind the endpoints.
 
 !!! note "This site is for version 0.1.x"
     The API and configuration reference describe the code in [`ribaunt/pay`](https://github.com/ribaunt/pay). If you are running a different revision, check the repository for changes.

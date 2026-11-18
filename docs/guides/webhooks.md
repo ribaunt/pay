@@ -29,7 +29,7 @@ curl -X POST https://pay.example.com/api/webhooks \
 }
 ```
 
-Copy the secret now: it is shown only once and stored encrypted at rest. Omit `events` to receive everything (`*`).
+Copy the secret now: it's shown only once and stored encrypted at rest. Omit `events` to receive everything (`*`).
 
 ### URL rules
 
@@ -37,7 +37,7 @@ Copy the secret now: it is shown only once and stored encrypted at rest. Omit `e
 - No credentials in the URL.
 - No private or loopback addresses, including `localhost`, `*.local`, `*.internal`, RFC1918 ranges, link-local, and IPv6 ULA/link-local.
 - The hostname is resolved at registration and again at dispatch; any private result is rejected.
-- Redirects are not followed.
+- Redirects aren't followed.
 
 These checks stop an API key holder from turning a webhook into a request to your internal network.
 
@@ -56,7 +56,7 @@ These checks stop an API key holder from turning a webhook into a request to you
 | `payment.late` | A payment arrived after expiry, or a late payment was updated. |
 | `payment.renewed` | An expired link was renewed. |
 
-Only actual status transitions emit events, so a link does not fire `payment.confirming` on every settlement pass.
+Only actual status transitions emit events, so a link doesn't fire `payment.confirming` on every settlement pass.
 
 ## Delivery format
 
@@ -100,7 +100,7 @@ function verify(rawBody, headers, secret) {
 }
 ```
 
-Read the body as raw text — parsing and re-serializing JSON changes the bytes and breaks the signature. Respond with a 2xx status to mark the delivery done.
+Read the body as raw text. Parsing and re-serializing JSON changes the bytes and breaks the signature. Respond with a 2xx status to mark the delivery done.
 
 ## Dispatch and retries
 
@@ -118,6 +118,6 @@ Each run takes up to 100 due deliveries. On failure the app retries with exponen
 
 ## Listing and removing
 
-`GET /api/webhooks` lists endpoints with `id`, `url`, `events`, `enabled`, and `createdAt` — never the secret. There is no delete endpoint; set `enabled` to `false` directly in the database to stop deliveries.
+`GET /api/webhooks` lists endpoints with `id`, `url`, `events`, `enabled`, and `createdAt`, but never the secret. There's no delete endpoint; set `enabled` to `false` directly in the database to stop deliveries.
 
 See the [Webhooks API reference](../api/webhooks.md) for all request and response fields.

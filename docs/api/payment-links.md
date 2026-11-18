@@ -8,7 +8,7 @@ Create and manage payment requests with the server-to-server API. See the [guide
 
 ## Create a link
 
-`POST /api/payment-links` — requires `x-api-key` with `payment:write`.
+`POST /api/payment-links` requires `x-api-key` with `payment:write`.
 
 === "Fiat price"
 
@@ -45,7 +45,7 @@ Create and manage payment requests with the server-to-server API. See the [guide
 | `requiredConfirmations` | number | no | Integer 1–100. |
 | `label`, `description` | string | no | Up to 200 characters. |
 
-Optional header: `Idempotency-Key`. It is scoped to the API key and lasts 24 hours.
+Optional header: `Idempotency-Key`. It's scoped to the API key and lasts 24 hours.
 
 ### Response `201`
 
@@ -81,7 +81,7 @@ Keep `statusToken` on your server. Show `uri` or `address` plus `amountXmr` to t
 
 ## List links
 
-`GET /api/payment-links` — API key with `payment:read`, or a session.
+`GET /api/payment-links` accepts an API key with `payment:read` or a session.
 
 ```bash
 curl 'https://pay.example.com/api/payment-links?status=late' \
@@ -96,7 +96,7 @@ Returns the 100 most recent records, newest first. `status` is an optional exact
 
 ## Read status
 
-`GET /api/payment-links/{id}/status` — requires `x-status-token`.
+`GET /api/payment-links/{id}/status` requires `x-status-token`.
 
 ```bash
 curl https://pay.example.com/api/payment-links/clh1234567890/status \
@@ -131,7 +131,7 @@ curl https://pay.example.com/api/payment-links/clh1234567890/status \
 
 ## Cancel
 
-`POST /api/payment-links/{id}/cancel` — API key with `payment:write`, or a session.
+`POST /api/payment-links/{id}/cancel` accepts an API key with `payment:write` or a session.
 
 ```json
 { "id": "clh1234567890", "status": "cancelled" }
@@ -141,13 +141,13 @@ Only a `pending` link with no `txHash` and no `paidAt` can be cancelled. Otherwi
 
 ## Renew
 
-`POST /api/payment-links/{id}/renew` — API key with `payment:write`, or a session. Returns `201` with the same shape as create, wrapped in `{ "link": ... }`.
+`POST /api/payment-links/{id}/renew` accepts an API key with `payment:write` or a session. It returns `201` with the same shape as create, wrapped in `{ "link": ... }`.
 
 Renewal requires an `expired` link with no transaction. It creates a new subaddress, a new token, a default-length expiry, and a fresh fiat quote when applicable. `409` covers all other states.
 
 ## Settlement cron
 
-`POST /api/cron/payment-links` — requires `x-cron-secret`.
+`POST /api/cron/payment-links` requires `x-cron-secret`.
 
 ```bash
 curl -X POST https://pay.example.com/api/cron/payment-links \

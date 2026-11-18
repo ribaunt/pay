@@ -84,7 +84,7 @@ If the wallet RPC is unreachable, wallet and daemon heights are reported as `0` 
 | `200` | Database, wallet RPC, and daemon are all reachable. |
 | `503` | At least one dependency is unreachable. |
 
-A `syncing` wallet does not change the HTTP status as long as the dependencies answer; watch `sync.status` and `pay_wallet_sync_lag_blocks` for that.
+A `syncing` wallet doesn't change the HTTP status as long as the dependencies answer; watch `sync.status` and `pay_wallet_sync_lag_blocks` for that.
 
 ## Side effects
 

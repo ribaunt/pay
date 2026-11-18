@@ -24,12 +24,12 @@ https://pay.example.com   # behind your TLS proxy
 | API key | `x-api-key: <key>` | Server-to-server link creation, listings, webhooks, audit, metrics. |
 | Cron secret | `x-cron-secret: <secret>` | Settlement and webhook dispatch. |
 | Status token | `x-status-token: <token>` | Reading a payment link's status. |
-| None | — | Health, price quotes, login, public proof verification. |
+| None | none | Health, price quotes, login, public proof verification. |
 
-There is no registration endpoint. The only credentials are `SINGLE_USER_EMAIL` and `SINGLE_USER_PASSWORD` from `.env`.
+There's no registration endpoint. The only credentials are `SINGLE_USER_EMAIL` and `SINGLE_USER_PASSWORD` from `.env`.
 
 !!! note "One key, one purpose"
-    A cron secret does not work as an API key, and a status token does not authorize anything else. Trying the wrong method returns `401` or `404`.
+    A cron secret doesn't work as an API key, and a status token doesn't authorize anything else. Trying the wrong method returns `401` or `404`.
 
 ## Conventions
 

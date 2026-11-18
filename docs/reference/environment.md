@@ -11,10 +11,10 @@ Every setting lives in `.env` at the repository root. Compose passes the relevan
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `POSTGRES_USER` | `pay` | no | Database user. |
-| `POSTGRES_PASSWORD` | — | **yes** | At least 16 characters. |
+| `POSTGRES_PASSWORD` | none | **yes** | At least 16 characters. |
 | `POSTGRES_DB` | `pay` | no | Database name. |
 | `POSTGRES_PORT` | `5432` | no | Host port for the DB in the `prod` profile. |
-| `DATABASE_URL` | — | no | Prisma connection string; Compose builds it from the values above. |
+| `DATABASE_URL` | none | no | Prisma connection string; Compose builds it from the values above. |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | no | Public base URL of the app. |
 | `NODE_ENV` | `production` | no | Enables validation and secure cookies when `production`. |
 | `COMPOSE_PROFILES` | `prod` | no | Comma-separated profiles to start. |
@@ -23,15 +23,15 @@ Every setting lives in `.env` at the repository root. Compose passes the relevan
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `SINGLE_USER_EMAIL` | — | **yes** | The only accepted sign-in email. |
-| `SINGLE_USER_PASSWORD` | — | **yes** | At least 12 characters. |
-| `SESSION_SECRET` | — | **yes** | At least 32 characters; signs session cookies. |
-| `WALLET_ENCRYPTION_KEY` | — | **yes** | Exactly 64 hex characters (32 bytes) for AES-256-GCM. |
-| `PAYMENT_API_KEY` | — | **yes** | At least 24 characters; bootstrap server key. |
-| `CRON_SECRET` | — | **yes** | At least 24 characters; protects cron endpoints. |
-| `BACKUP_PASSPHRASE` | — | for backups | Passphrase for the encryption scripts. |
+| `SINGLE_USER_EMAIL` | none | **yes** | The only accepted sign-in email. |
+| `SINGLE_USER_PASSWORD` | none | **yes** | At least 12 characters. |
+| `SESSION_SECRET` | none | **yes** | At least 32 characters; signs session cookies. |
+| `WALLET_ENCRYPTION_KEY` | none | **yes** | Exactly 64 hex characters (32 bytes) for AES-256-GCM. |
+| `PAYMENT_API_KEY` | none | **yes** | At least 24 characters; bootstrap server key. |
+| `CRON_SECRET` | none | **yes** | At least 24 characters; protects cron endpoints. |
+| `BACKUP_PASSPHRASE` | none | for backups | Passphrase for the encryption scripts. |
 
-Generate random values with `openssl rand -hex 32` or your password manager. Do not reuse a value across variables.
+Generate random values with `openssl rand -hex 32` or your password manager. Don't reuse a value across variables.
 
 ## Monero
 
@@ -43,8 +43,8 @@ Generate random values with `openssl rand -hex 32` or your password manager. Do 
 | `MONERO_DAEMON_PROXY` | empty | no | SOCKS proxy address, e.g. `127.0.0.1:9050`. |
 | `MONERO_DAEMON_FALLBACKS` | empty | no | Comma-separated extra daemon addresses used by the health check. |
 | `MONERO_RPC_USER` | `monero` | **yes** | Digest username for `monero-wallet-rpc`. |
-| `MONERO_RPC_PASSWORD` | — | **yes** | At least 16 characters. |
-| `MONERO_WALLET_PASSWORD` | — | **yes** | At least 16 characters; encrypts wallet files. |
+| `MONERO_RPC_PASSWORD` | none | **yes** | At least 16 characters. |
+| `MONERO_WALLET_PASSWORD` | none | **yes** | At least 16 characters; encrypts wallet files. |
 | `MONERO_WALLET_RPC_URL` | `http://localhost:18082` | no | Set to `http://wallet-rpc:18082` by Compose. |
 
 ## Payments and pricing
@@ -85,4 +85,4 @@ Generate random values with `openssl rand -hex 32` or your password manager. Do 
 Integer settings such as timeouts are read through a helper that rejects negative or non-finite values. `MONERO_NETWORK` rejects anything other than the two supported names.
 
 !!! warning "Restart after changes"
-    Compose injects environment at container start. After editing `.env`, recreate containers with `docker compose up -d --force-recreate`. Changing encryption or wallet keys needs a planned migration — see [Configuration](../getting-started/configuration.md).
+    Compose injects environment at container start. After editing `.env`, recreate containers with `docker compose up -d --force-recreate`. Changing encryption or wallet keys needs a planned migration. See [Configuration](../getting-started/configuration.md).

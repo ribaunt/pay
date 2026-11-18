@@ -4,7 +4,7 @@ icon: lucide/map
 
 # Guides
 
-Task-focused walkthroughs for running Ribaunt Pay day to day. Each guide assumes you already have a working stack — if not, begin with the [quickstart](../getting-started/quickstart.md).
+Task-focused walkthroughs for running Ribaunt Pay day to day. Each guide assumes you already have a working stack. If you don't, start with the [quickstart](../getting-started/quickstart.md).
 
 <div class="grid cards" markdown>
 
@@ -79,6 +79,22 @@ Task-focused walkthroughs for running Ribaunt Pay day to day. Each guide assumes
     Health checks, Prometheus metrics, and alert rules.
 
     [Open guide](monitoring.md)
+
+-   :lucide-chart-line:{ .lg .middle } __Prometheus__
+
+    ---
+
+    Scrape the metrics endpoint, load alert rules, and write useful queries.
+
+    [Open guide](prometheus.md)
+
+-   :lucide-layout-dashboard:{ .lg .middle } __Grafana__
+
+    ---
+
+    Provision a data source and import the ready-made dashboard.
+
+    [Open guide](grafana.md)
 
 -   :lucide-code:{ .lg .middle } __Development__
 

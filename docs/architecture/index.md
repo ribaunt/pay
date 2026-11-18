@@ -45,11 +45,11 @@ A single wallet can be open at a time. The app serializes `open_wallet` / `close
 
 ### Monero node
 
-You provide the node. The stack does not bundle `monerod`. In production the app requires `MONERO_DAEMON_MODE=full-scan`, which keeps view-key scanning local instead of sending the view key to a remote daemon. A SOCKS proxy can route that traffic.
+You provide the node. The stack doesn't bundle `monerod`. In production the app requires `MONERO_DAEMON_MODE=full-scan`, which keeps view-key scanning local instead of sending the view key to a remote daemon. A SOCKS proxy can route that traffic.
 
 ### Price sources
 
-Fiat links are quoted from CoinGecko, CoinCap, Coinbase, and Kraken for XMR/USD, plus Frankfurter or exchangerate.host for currency conversion. Results are aggregated by median with outlier filtering. The rate is stored on the payment request when it is created.
+Fiat links are quoted from CoinGecko, CoinCap, Coinbase, and Kraken for XMR/USD, plus Frankfurter or exchangerate.host for currency conversion. Results are aggregated by median with outlier filtering. The rate is stored on the payment request when it's created.
 
 ## Two kinds of caller
 
@@ -60,22 +60,22 @@ Fiat links are quoted from CoinGecko, CoinCap, Coinbase, and Kraken for XMR/USD,
 | Scheduler | `x-cron-secret` | Settlement and webhook dispatch only. |
 | Anonymous | Status token in a header, or nothing at all | Payment status and proof verification. |
 
-There is no sign-up or anonymous-session endpoint. The only account is the one configured in `.env`.
+There's no sign-up or anonymous-session endpoint. The only account is the one configured in `.env`.
 
-## What is automatic and what is not
+## What is automatic and what isn't
 
-Creating a link writes state and generates an address immediately. Everything that follows — detecting a transfer, advancing confirmations, expiring a link, emitting and delivering webhooks — is driven by cron endpoints:
+Creating a link writes state and generates an address immediately. Everything else happens on a schedule: detecting the transfer, advancing confirmations, expiring the link, and emitting webhooks. Two cron endpoints drive it:
 
 ```text
 POST /api/cron/payment-links   → settlement pass
 POST /api/cron/webhooks        → delivery pass
 ```
 
-Both require `x-cron-secret`. A missed cron means stuck payment states, not lost funds — the next pass catches up.
+Both require `x-cron-secret`. A missed cron leaves payments in their current state. It doesn't lose funds, and the next pass catches up.
 
 ## Read next
 
-- [Payment lifecycle](payment-lifecycle.md) — states, settlement math, and event timing.
-- [Privacy model](privacy-model.md) — what is stored, what is never sent, and why.
-- [Data model](data-model.md) — every Prisma model and its important fields.
-- [API overview](../api/index.md) — endpoints grouped by audience.
+- [Payment lifecycle](payment-lifecycle.md): states, settlement math, and event timing.
+- [Privacy model](privacy-model.md): what is stored, what never leaves your host, and why.
+- [Data model](data-model.md): every Prisma model and its important fields.
+- [API overview](../api/index.md): endpoints grouped by audience.

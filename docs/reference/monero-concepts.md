@@ -15,7 +15,7 @@ Monero amounts are integers of **piconero**. One XMR is `1_000_000_000_000` pico
 1 XMR     = 1000000000000 piconero
 ```
 
-XMR amounts in API requests accept at most 12 decimal places. Before an amount is sent to JSON-RPC, the app checks it is within JavaScript's safe integer range so precision is never silently lost in transit.
+XMR amounts in API requests accept at most 12 decimal places. Before an amount is sent to JSON-RPC, the app checks it's within JavaScript's safe integer range so precision is never silently lost in transit.
 
 ## Primary address and subaddress
 
@@ -32,9 +32,9 @@ All addresses must be 95 characters. The app rejects addresses from the wrong ne
 
 ## Private view key
 
-The private view key lets a wallet recognize incoming outputs and their amounts. A private **spend** key is required to move funds. Ribaunt Pay asks only for the view key and the primary address, so it can watch and prove payments but cannot spend them.
+The private view key lets a wallet recognize incoming outputs and their amounts. A private **spend** key is required to move funds. Ribaunt Pay asks only for the view key and the primary address, so it can watch and prove payments but can't spend them.
 
-The view key is encrypted with AES-256-GCM before being written to PostgreSQL and is never returned by an API. It is still sensitive: anyone who has it can read your incoming transaction history.
+The view key is encrypted with AES-256-GCM before being written to PostgreSQL and is never returned by an API. It's still sensitive: anyone who has it can read your incoming transaction history.
 
 ## Restore height
 
@@ -44,7 +44,7 @@ The restore height is the block where the wallet was created. It tells the walle
 
 A transaction is first seen in the mempool, then included in a block. Each block added after that increases the confirmation count. Ribaunt Pay computes it as `walletHeight - blockHeight + 1`.
 
-A link becomes `confirmed` when confirmations reach its required value — 10 by default, or a per-link override between 1 and 100. More confirmations mean a lower chance of a chain reorganization undoing the payment.
+A link becomes `confirmed` when confirmations reach its required value: 10 by default, or a per-link override between 1 and 100. More confirmations mean a lower chance of a chain reorganization undoing the payment.
 
 ## Remote node modes
 

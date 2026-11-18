@@ -4,7 +4,7 @@ icon: lucide/code
 
 # Development
 
-The project uses Next.js 16 with the App Router, TypeScript, Prisma, and the built-in Node test runner. There is no Vitest or Vite setup.
+The project uses Next.js 16 with the App Router, TypeScript, Prisma, and the built-in Node test runner. There's no Vitest or Vite setup.
 
 ## Local environment
 
@@ -88,15 +88,15 @@ A useful convention: route handlers stay thin and delegate to a function in `lib
 
 Every push and pull request runs three jobs:
 
-- **unit** — `npm ci`, tests, type-check, build, and `npm audit --omit=dev --audit-level=high`.
-- **artifacts** — builds both images, generates SPDX SBOMs with Syft, signs them with cosign, and verifies the signatures.
-- **integration** — generates throwaway secrets, starts the production stack on stagenet, waits for health, and runs the smoke test.
+- **unit**: `npm ci`, tests, type-check, build, and `npm audit --omit=dev --audit-level=high`.
+- **artifacts**: builds both images, generates SPDX SBOMs with Syft, signs them with cosign, and verifies the signatures.
+- **integration**: generates throwaway secrets, starts the production stack on stagenet, waits for health, and runs the smoke test.
 
 Tool downloads are pinned to versions and checked against SHA-256 digests before use.
 
 ## Working on these docs
 
-The documentation is not part of the Next.js app. It is a Zensical project at the repository root:
+The documentation isn't part of the Next.js app. It's a Zensical project at the repository root:
 
 ```bash
 python3 -m venv .venv

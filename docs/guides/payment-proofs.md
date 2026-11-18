@@ -35,7 +35,7 @@ curl -X POST https://pay.example.com/api/wallet/payment-proofs \
 The proof is saved on the wallet record with a unique constraint on `(walletId, txHash, address, message)`, so regenerating it updates the existing signature. `GET /api/wallet/payment-proofs` returns the last 100 proofs.
 
 !!! note "The message matters"
-    The message is part of the signed payload. Verification must use exactly the same message, including capitalization and whitespace. Leave it out on both sides if you do not need one.
+    The message is part of the signed payload. Verification must use exactly the same message, including capitalization and whitespace. Leave it out on both sides if you don't need one.
 
 ## Verify a proof publicly
 
@@ -68,7 +68,7 @@ curl -X POST https://pay.example.com/api/public/payment-proofs/verify \
 | `inPool` | Whether the transaction is still in the mempool. |
 | `receivedXmr` | Amount received at the given address in this transaction. |
 
-The RPC call behind this does not need the wallet that generated the proof to be loaded — any configured wallet can drive `check_tx_proof`. At least one wallet must be configured, or verification returns an error.
+The RPC call behind this doesn't need the wallet that generated the proof to be loaded. Any configured wallet can drive `check_tx_proof`. At least one wallet must be configured, or verification returns an error.
 
 ## Validation rules
 

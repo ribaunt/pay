@@ -53,7 +53,7 @@ Give the customer `uri` (or `address` plus `amountXmr`). Keep `statusToken` on y
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `fiatAmount` | string | Decimal with up to 12 fractional digits. Mutually exclusive with `amountXmr` in practice — supply one. |
+| `fiatAmount` | string | Decimal with up to 12 fractional digits. In practice, supply either this or `amountXmr`. |
 | `fiatCurrency` | string | Required with `fiatAmount`, e.g. `USD`, `EUR`. |
 | `amountXmr` | string | Decimal XMR amount, up to 12 decimal places. |
 | `timeoutSeconds` | number | Optional. `0` means no expiry. Values are clamped between the configured minimum and maximum. |
@@ -61,11 +61,11 @@ Give the customer `uri` (or `address` plus `amountXmr`). Keep `statusToken` on y
 | `label`, `description` | string | Optional labels up to 200 characters. |
 
 !!! tip "Fiat rates are locked"
-    When you use `fiatAmount`, the app fetches a quote, converts it to an atomic XMR amount with fixed-point math (rounding up), and stores the rate, FX rate, and source list on the request. Later price movements do not change the amount the customer owes.
+    When you use `fiatAmount`, the app fetches a quote, converts it to an atomic XMR amount with fixed-point math (rounding up), and stores the rate, FX rate, and source list on the request. Later price movements don't change the amount the customer owes.
 
 ## Check status
 
-Status is public in the sense that no account is required, but it is protected by a token that is **never placed in the URL**:
+Status is public in the sense that no account is required, but it's protected by a token that's **never placed in the URL**:
 
 ```bash
 curl https://pay.example.com/api/payment-links/<id>/status \

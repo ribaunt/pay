@@ -8,10 +8,10 @@ Ribaunt Pay never holds spend keys. It restores a wallet from your **primary add
 
 ## What a view key can do
 
-A private view key lets the wallet see incoming outputs and their amounts. It cannot spend them. That is why Ribaunt Pay can detect payments and produce proofs without ever being able to move funds.
+A private view key lets the wallet see incoming outputs and their amounts. It can't spend them. That's why Ribaunt Pay can detect payments and produce proofs without ever being able to move funds.
 
 !!! warning "Treat the view key as sensitive"
-    It does not allow spending, but it does expose your transaction history to anyone who has it. Store it in `.env`-grade secrecy and never paste it into a public issue or chat.
+    It doesn't allow spending, but it does expose your transaction history to anyone who has it. Store it in `.env`-grade secrecy and never paste it into a public issue or chat.
 
 ## Set up through the UI
 
@@ -36,7 +36,7 @@ curl -X POST http://localhost:3000/api/wallet/setup \
 
 ### Choosing a restore height
 
-The restore height is the block where the wallet was created. It tells the RPC where to start scanning. A value of `0` scans from genesis and can take a very long time. If you do not know the exact height, use a conservative earlier block — scanning extra blocks is harmless, just slower.
+The restore height is the block where the wallet was created. It tells the RPC where to start scanning. A value of `0` scans from genesis and can take a very long time. If you don't know the exact height, use an earlier block that you know is safe. Scanning extra blocks is harmless, just slower.
 
 The app tries to move the scan cursor with `rescan_blockchain` when a non-zero restore height is supplied. If that call fails, setup still succeeds and the wallet continues from its current height.
 
@@ -59,7 +59,7 @@ Because `monero-wallet-rpc` serves one open wallet at a time, the app serializes
 
 ## Subaddresses
 
-Every payment link gets a fresh subaddress so incoming payments cannot be linked to one another by address.
+Every payment link gets a fresh subaddress so incoming payments can't be linked to one another by address.
 
 === "List subaddresses"
 

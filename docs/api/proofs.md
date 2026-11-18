@@ -8,7 +8,7 @@ Generate proofs from the recipient's watch-only wallet and verify them without a
 
 ## Generate a proof
 
-`POST /api/wallet/payment-proofs` — session required, 30 per minute.
+`POST /api/wallet/payment-proofs` needs a session and allows 30 calls per minute.
 
 ```bash
 curl -X POST https://pay.example.com/api/wallet/payment-proofs \
@@ -42,7 +42,7 @@ Response `201`:
 
 ## List proofs
 
-`GET /api/wallet/payment-proofs` — session required.
+`GET /api/wallet/payment-proofs` needs a session.
 
 ```json
 { "proofs": [ { "id": "clh...", "txHash": "3e4f...", "address": "8A...", "message": "Invoice 1042", "signature": "...", "createdAt": "..." } ] }
@@ -52,7 +52,7 @@ The 100 newest proofs are returned.
 
 ## Verify a proof
 
-`POST /api/public/payment-proofs/verify` — public, 30 per minute.
+`POST /api/public/payment-proofs/verify` is public and allows 30 calls per minute.
 
 ```bash
 curl -X POST https://pay.example.com/api/public/payment-proofs/verify \
@@ -81,7 +81,7 @@ curl -X POST https://pay.example.com/api/public/payment-proofs/verify \
 | `inPool` | boolean | Transaction is still in the mempool. |
 | `receivedXmr` | string | Amount received at the address. |
 
-Verification requires at least one configured wallet to drive the RPC call, but it does not have to be the wallet that created the proof. No session, API key, or personal data is needed.
+Verification requires at least one configured wallet to drive the RPC call, but it doesn't have to be the wallet that created the proof. No session, API key, or personal data is needed.
 
 | Error | Reason |
 | --- | --- |

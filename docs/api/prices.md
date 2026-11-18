@@ -75,5 +75,5 @@ curl 'https://pay.example.com/api/prices/quote?fiatAmount=10.50&fiatCurrency=EUR
 | `502` | No price sources available and no usable cached quote. |
 | `429` | Rate limit exceeded. |
 
-!!! note "Quotes are not reservations"
-    Calling this endpoint does not lock a rate. A payment link does: it stores the quote on the request so later price changes do not alter what the customer owes.
+!!! note "Quotes aren't reservations"
+    Calling this endpoint doesn't lock a rate. A payment link does: it stores the quote on the request so later price changes don't alter what the customer owes.

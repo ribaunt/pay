@@ -8,7 +8,7 @@ Manage API keys and scrape process metrics. Both require authentication; neither
 
 ## List API keys
 
-`GET /api/admin/api-keys` — session required.
+`GET /api/admin/api-keys` needs a signed-in session.
 
 ```json
 {
@@ -31,7 +31,7 @@ Key hashes and secrets are never included.
 
 ## Create an API key
 
-`POST /api/admin/api-keys` — session required, 10 per minute.
+`POST /api/admin/api-keys` needs a session and allows 10 calls per minute.
 
 ```bash
 curl -X POST https://pay.example.com/api/admin/api-keys \
@@ -42,7 +42,7 @@ curl -X POST https://pay.example.com/api/admin/api-keys \
 
 | Field | Default | Notes |
 | --- | --- | --- |
-| `name` | — | Required, at most 80 characters. |
+| `name` | required | At most 80 characters. |
 | `scopes` | `payment:write,payment:read` | Lowercase letters, colons, commas, and spaces only. |
 
 Response `201`:
@@ -59,11 +59,11 @@ Response `201`:
 }
 ```
 
-Copy `secret` immediately — it is generated with `pk_` plus 24 random bytes and stored only as a hash.
+Copy `secret` right away. It starts with `pk_`, contains 24 random bytes, and is stored only as a hash.
 
 ## Revoke an API key
 
-`POST /api/admin/api-keys/{id}/revoke` — session required.
+`POST /api/admin/api-keys/{id}/revoke` needs a session.
 
 ```json
 { "id": "clh...", "revokedAt": "2026-11-18T14:00:00.000Z" }
@@ -73,7 +73,7 @@ Revocation takes effect on the next request. Unknown IDs produce an error.
 
 ## Metrics
 
-`GET /api/metrics` — session, or API key with `metrics:read`.
+`GET /api/metrics` accepts a session or an API key with `metrics:read`.
 
 ```bash
 curl https://pay.example.com/api/metrics \
@@ -89,7 +89,7 @@ pay_payment_links_created_total 12
 pay_payment_status_transitions_total{status="confirmed"} 5
 ```
 
-Content type is `text/plain; version=0.0.4`. The full metric list and suggested alerts are in [Monitoring](../guides/monitoring.md).
+Content type is `text/plain; version=0.0.4`. The full metric list and suggested alerts are in [Monitoring](../guides/monitoring.md). For scrape configuration and dashboards, see [Prometheus](../guides/prometheus.md) and [Grafana](../guides/grafana.md).
 
 !!! note "Per-process values"
-    Counters live in memory. They reset on restart and are not shared between replicas. Health checks refresh the dependency gauges, so scrape regularly.
+    Counters live in memory. They reset on restart and aren't shared between replicas. Health checks refresh the dependency gauges, so scrape regularly.

@@ -40,12 +40,12 @@ The credentials come from environment variables, not from the database. Logging 
 
 ### Secrets
 
-These are checked at startup. Use a password manager or `openssl rand` to generate them; do not reuse values.
+These are checked at startup. Use a password manager or `openssl rand` to generate them; don't reuse values.
 
 | Variable | Rule |
 | --- | --- |
 | `SESSION_SECRET` | At least 32 characters. Signs the session cookie. |
-| `WALLET_ENCRYPTION_KEY` | Exactly 64 hex characters — a 32-byte AES-256-GCM key. |
+| `WALLET_ENCRYPTION_KEY` | 64 hex characters (32 bytes) for AES-256-GCM. |
 | `MONERO_RPC_USER` / `MONERO_RPC_PASSWORD` | HTTP Digest credentials for `monero-wallet-rpc`. Password at least 16 characters. |
 | `MONERO_WALLET_PASSWORD` | Encrypts wallet files on the `wallet_data` volume. At least 16 characters. |
 | `PAYMENT_API_KEY` | Bootstrap server-to-server key. At least 24 characters. |
@@ -53,7 +53,7 @@ These are checked at startup. Use a password manager or `openssl rand` to genera
 | `BACKUP_PASSPHRASE` | Needed by the backup and restore scripts. |
 
 !!! warning "Changing a key after setup"
-    `WALLET_ENCRYPTION_KEY`, `MONERO_WALLET_PASSWORD`, and `SESSION_SECRET` are not just login details. Changing them breaks the ability to decrypt stored view keys, open wallet files, or validate existing sessions. Back up first and plan the migration.
+    `WALLET_ENCRYPTION_KEY`, `MONERO_WALLET_PASSWORD`, and `SESSION_SECRET` aren't just login details. Changing them breaks the ability to decrypt stored view keys, open wallet files, or validate existing sessions. Back up first and plan the migration.
 
 ### Monero
 
@@ -114,7 +114,7 @@ MONERO_DAEMON_MODE=full-scan
 TRUST_PROXY=0
 ```
 
-Never commit `.env`. It is already in `.gitignore`; keep the file at mode `600`.
+Never commit `.env`. It's already in `.gitignore`; keep the file at mode `600`.
 
 ## Applying changes
 
@@ -124,4 +124,4 @@ Most variables are read when a container starts, so restart the stack after edit
 docker compose up -d --force-recreate
 ```
 
-If you change a wallet-related key, read the warning above before restarting — the stored view key may no longer decrypt.
+If you change a wallet-related key, read the warning above before restarting. The stored view key may no longer decrypt.

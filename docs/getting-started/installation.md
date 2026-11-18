@@ -91,7 +91,7 @@ You are looking for `status: ok`. A `degraded` response means one of Postgres, w
 
 ```bash
 docker compose down        # keep data volumes
-docker compose down -v     # delete data volumes — this removes the database and wallet files
+docker compose down -v     # delete data volumes, including the database and wallet files
 ```
 
 !!! danger "`-v` is destructive"
@@ -99,7 +99,7 @@ docker compose down -v     # delete data volumes — this removes the database a
 
 ## Building these docs locally
 
-The documentation site uses [Zensical](https://zensical.org/). It is independent of the app:
+The documentation site uses [Zensical](https://zensical.org/). It's independent of the app:
 
 ```bash
 python3 -m venv .venv

@@ -8,7 +8,7 @@ These endpoints read and configure the watch-only wallet. Most require a session
 
 ## Set up the wallet
 
-`POST /api/wallet/setup` — session required, limited to 5 calls per minute.
+`POST /api/wallet/setup` needs a session and allows 5 calls per minute.
 
 ```bash
 curl -X POST https://pay.example.com/api/wallet/setup \
@@ -55,7 +55,7 @@ The view key is encrypted before storage and never returned. Spend keys are neve
 
 ## Transfers
 
-`GET /api/wallet/transfers` — session required.
+`GET /api/wallet/transfers` needs a session.
 
 Query flags accept `1`, `true`, `0`, or `false`:
 
@@ -93,7 +93,7 @@ Results are sorted by timestamp, newest first.
 
 ## Subaddresses
 
-`GET /api/wallet/subaddresses` — session required. Reconciles stored records with the RPC and returns them by index:
+`GET /api/wallet/subaddresses` needs a session. It reconciles stored records with the RPC and returns them by index:
 
 ```json
 {
@@ -103,7 +103,7 @@ Results are sorted by timestamp, newest first.
 }
 ```
 
-`POST /api/wallet/subaddresses` — body `{ "label": "optional" }`, returns `201`:
+`POST /api/wallet/subaddresses` takes `{ "label": "optional" }` and returns `201`:
 
 ```json
 { "subaddress": { "address": "8A...", "addressIndex": 2, "label": "optional" } }
@@ -113,7 +113,7 @@ Results are sorted by timestamp, newest first.
 
 These create a stored request directly, without a fiat quote or status token.
 
-`POST /api/wallet/payment-requests` — body `{ "amountXmr": "0.01", "label": "Order", "timeoutSeconds": 1800 }`, returns `201`:
+`POST /api/wallet/payment-requests` takes `{ "amountXmr": "0.01", "label": "Order", "timeoutSeconds": 1800 }` and returns `201`:
 
 ```json
 {
@@ -133,7 +133,7 @@ These create a stored request directly, without a fiat quote or status token.
 
 ## Audit export
 
-`GET /api/wallet/audit?format=json|csv` — session, or API key with `payment:read`.
+`GET /api/wallet/audit?format=json|csv` accepts a session or an API key with `payment:read`.
 
 The JSON report contains the wallet address, restore height, network, and up to 1000 payment requests with their transfers, amounts, and timestamps. It never includes keys.
 
@@ -147,7 +147,7 @@ The CSV has columns `id`, `label`, `status`, `address`, `amountXmr`, `receivedXm
 
 ## Close the wallet
 
-`POST /api/wallet/close` — session required.
+`POST /api/wallet/close` needs a session.
 
 ```json
 { "ok": true }

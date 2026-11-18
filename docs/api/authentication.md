@@ -4,7 +4,7 @@ icon: lucide/key-round
 
 # Authentication
 
-Ribaunt Pay uses four independent credentials. This page explains each one and where it is accepted.
+Ribaunt Pay uses four independent credentials. This page explains each one and where it's accepted.
 
 ## Session cookies
 
@@ -21,7 +21,7 @@ curl -X POST https://pay.example.com/api/auth/login \
 { "user": { "id": "single-user", "email": "admin@example.com", "name": null } }
 ```
 
-The response sets `pay_session`, an HMAC-SHA256-signed token containing the user ID, expiry, and session version. It is HTTP-only, SameSite=Lax, Secure in production, and valid for seven days.
+The response sets `pay_session`, an HMAC-SHA256-signed token containing the user ID, expiry, and session version. It's HTTP-only, SameSite=Lax, Secure in production, and valid for seven days.
 
 ```bash
 curl -b cookies.txt https://pay.example.com/api/auth/me
@@ -31,7 +31,7 @@ curl -X POST -b cookies.txt https://pay.example.com/api/auth/logout
 # {"ok": true}
 ```
 
-Logout increments the user's `sessionVersion`, so every cookie issued before it stops working — even if it was copied elsewhere. There is no `/api/auth/register` or `/api/auth/anonymous`.
+Logout increments the user's `sessionVersion`, so every cookie issued before it stops working, even if someone copied it elsewhere. There's no `/api/auth/register` or `/api/auth/anonymous`.
 
 Wrong credentials return `401` with `{"error": "Invalid credentials"}`. Login is limited to 10 attempts per minute.
 
@@ -77,7 +77,7 @@ curl https://pay.example.com/api/payment-links/<id>/status \
   -H "x-status-token: <statusToken>"
 ```
 
-The token is 32 random bytes in base64url. Only its SHA-256 hash is stored. A missing or incorrect token returns `404`, so the link cannot be probed by ID alone. Tokens are never part of a URL.
+The token is 32 random bytes in base64url. Only its SHA-256 hash is stored. A missing or incorrect token returns `404`, so the link can't be probed by ID alone. Tokens are never part of a URL.
 
 ## Public endpoints
 

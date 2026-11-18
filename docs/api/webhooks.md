@@ -8,7 +8,7 @@ Register endpoints, inspect them, and drive delivery. The [webhook guide](../gui
 
 ## Register an endpoint
 
-`POST /api/webhooks` — API key with `webhook:write`, or a session. Limited to 10 per minute.
+`POST /api/webhooks` accepts an API key with `webhook:write` or a session. It allows 10 calls per minute.
 
 ```bash
 curl -X POST https://pay.example.com/api/webhooks \
@@ -35,7 +35,7 @@ Response `201`:
 }
 ```
 
-The secret is shown once. It is encrypted in PostgreSQL and never returned again.
+The secret is shown once. It's encrypted in PostgreSQL and never returned again.
 
 | Error | Reason |
 | --- | --- |
@@ -44,7 +44,7 @@ The secret is shown once. It is encrypted in PostgreSQL and never returned again
 
 ## List endpoints
 
-`GET /api/webhooks` — API key with `webhook:read`, or a session.
+`GET /api/webhooks` accepts an API key with `webhook:read` or a session.
 
 ```json
 {
@@ -60,11 +60,11 @@ The secret is shown once. It is encrypted in PostgreSQL and never returned again
 }
 ```
 
-Secrets are not included. With an API key, only endpoints registered by that key are listed; a session lists all of them.
+Secrets aren't included. With an API key, only endpoints registered by that key are listed; a session lists all of them.
 
 ## Dispatch queued events
 
-`POST /api/cron/webhooks` — requires `x-cron-secret`.
+`POST /api/cron/webhooks` requires `x-cron-secret`.
 
 ```bash
 curl -X POST https://pay.example.com/api/cron/webhooks \
@@ -72,7 +72,7 @@ curl -X POST https://pay.example.com/api/cron/webhooks \
 # {"sent": 3, "failed": 1}
 ```
 
-Each run takes up to 100 due deliveries. A delivery is retried with `2^attempts` second backoff up to six attempts, after which it is marked `dead`.
+Each run takes up to 100 due deliveries. A delivery is retried with `2^attempts` second backoff up to six attempts, after which it's marked `dead`.
 
 ## Event names
 

@@ -32,7 +32,7 @@ stateDiagram-v2
 4. The wallet RPC generates a fresh subaddress and a `monero:` URI for the amount.
 5. The reservation becomes `pending`, the response snapshot is saved, and `payment.created` is queued.
 
-If any step after reservation fails, the reservation is deleted so it cannot block a retry.
+If any step after reservation fails, the reservation is deleted so it can't block a retry.
 
 ## Settlement
 
@@ -59,7 +59,7 @@ The checks run in this order:
 | Confirmations above zero | `confirming` |
 | Otherwise | `detected` |
 
-Additional transfers to the same subaddress top up an underpaid link. Overpayments are recorded in `receivedAtomic` and never trigger an automatic refund. A late payment keeps updating its confirmation count but is never auto-refunded either — it is meant for manual review via `GET /api/payment-links?status=late`.
+Additional transfers to the same subaddress top up an underpaid link. Overpayments are recorded in `receivedAtomic` and never trigger an automatic refund. A late payment keeps updating its confirmation count, but it never gets auto-refunded either. It stays there for manual review through `GET /api/payment-links?status=late`.
 
 ## Confirmations
 
@@ -73,10 +73,10 @@ Renewal is only allowed for an `expired` link with no transaction. It creates a 
 
 ## Events
 
-Events are emitted on actual status transitions, not on every pass. A link moving from `detected` to `confirming` emits once; further confirmations do not emit until the status changes again. Each event is queued as a `WebhookDelivery` row, and `POST /api/cron/webhooks` does the actual HTTP delivery.
+Events are emitted on actual status transitions, not on every pass. A link moving from `detected` to `confirming` emits once; further confirmations don't emit until the status changes again. Each event is queued as a `WebhookDelivery` row, and `POST /api/cron/webhooks` does the actual HTTP delivery.
 
 !!! tip "Handle events idempotently"
-    Deliveries are retried on failure, so the same event can arrive more than once. Use `x-pay-delivery-id` to deduplicate, and treat status as a value that can move forward — not as a one-time signal.
+    Deliveries are retried on failure, so the same event can arrive more than once. Use `x-pay-delivery-id` to deduplicate, and treat status as something that moves forward, not a one-time signal.
 
 ## Failure modes
 

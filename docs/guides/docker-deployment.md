@@ -45,13 +45,13 @@ PostgreSQL 16, pinned by digest. A health check gates the app's startup. The `po
 | `i2p_data` | I2P router data and tunnels. |
 | `postgres_data_dev`, `wallet_data_dev`, `dev_node_modules` | Development-only copies. |
 
-`docker compose down` keeps volumes. `docker compose down -v` deletes them — never run that without a [backup](backups.md).
+`docker compose down` keeps volumes. `docker compose down -v` deletes them. Never run that without a [backup](backups.md).
 
 ## Ports and exposure
 
-The production app listens on `3000`. Terminate TLS in front of it with nginx, Caddy, Traefik, or your platform's load balancer — the app deliberately does not handle certificates.
+The production app listens on `3000`. Terminate TLS in front of it with nginx, Caddy, Traefik, or your platform's load balancer. The app deliberately doesn't handle certificates.
 
-For a reverse proxy, set `TRUST_PROXY=1` only if the proxy **overwrites** `X-Forwarded-For`. Otherwise a client can spoof the header and bypass rate limits. With `TRUST_PROXY=0` (the default), API-key requests do not store any client IP at all.
+For a reverse proxy, set `TRUST_PROXY=1` only if the proxy **overwrites** `X-Forwarded-For`. Otherwise a client can spoof the header and bypass rate limits. With `TRUST_PROXY=0` (the default), API-key requests don't store any client IP at all.
 
 ```nginx
 server {
@@ -94,7 +94,7 @@ curl -X POST https://pay.example.com/api/cron/webhooks \
   -H "x-cron-secret: $CRON_SECRET"
 ```
 
-Both require `x-cron-secret`; there is no other way to trigger them.
+Both require `x-cron-secret`; there's no other way to trigger them.
 
 ## Upgrading
 

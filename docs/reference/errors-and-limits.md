@@ -87,4 +87,4 @@ A few routes intentionally process only a slice of data per call:
 | Webhook HTTP request timeout | 5 seconds. |
 | Daemon health request timeout | 5 seconds. |
 
-Run the cron endpoints frequently enough that these bounds do not become a backlog.
+Run the cron endpoints frequently enough that these bounds don't become a backlog.

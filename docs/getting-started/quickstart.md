@@ -39,7 +39,7 @@ Open `.env` and replace every placeholder. The app refuses to start in productio
 
     The [configuration reference](../reference/environment.md) lists everything else.
 
-!!! warning "Do not use the public default node in production"
+!!! warning "Don't use the public default node in production"
     An empty `MONERO_DAEMON_ADDRESS` falls back to a public node for the selected network. That leaks your server's IP address to a third party. Use your own node.
 
 ## 2. Start the stack
@@ -50,7 +50,7 @@ docker compose up --build
 
 This starts PostgreSQL, the Next.js app on port `3000`, and `monero-wallet-rpc` on the internal Compose network. Migrations run automatically when the app container starts.
 
-## 3. Check that it is alive
+## 3. Check that it's alive
 
 ```bash
 curl http://localhost:3000/api/health
@@ -79,7 +79,7 @@ A healthy response looks like this:
 }
 ```
 
-If `status` is `degraded`, find which service is `false` — the [health endpoint](../api/health.md) explains each field.
+If `status` is `degraded`, check which service is `false`. The [health endpoint](../api/health.md) explains each field.
 
 ## 4. Sign in and add your wallet
 
@@ -87,9 +87,9 @@ Open <http://localhost:3000>, sign in with the `.env` credentials, then go to `/
 
 - the wallet's **primary address** (`4...` on mainnet, `5...` on stagenet),
 - its **private view key** (64 hex characters),
-- a **restore height** — the block where the wallet was created. Use `0` only if you really want to scan from genesis; it is slow.
+- a **restore height**, the block where the wallet was created. Use `0` only if you really want to scan from genesis. It's slow.
 
-Spend keys are never asked for. The view key is encrypted with AES-256-GCM before it is stored.
+Spend keys are never asked for. The view key is encrypted with AES-256-GCM before it's stored.
 
 See [Watch-only wallet](../guides/watch-only-wallet.md) for details.
 
@@ -102,7 +102,7 @@ curl -X POST http://localhost:3000/api/payment-links \
   -d '{"fiatAmount": "10", "fiatCurrency": "USD", "timeoutSeconds": 1800}'
 ```
 
-The response contains a `uri` and `address` to show the customer, plus a `statusUrl` and a separate `statusToken`. Poll the status URL with the token in the `x-status-token` header — the token is deliberately not part of the URL.
+The response contains a `uri` and `address` to show the customer, plus a `statusUrl` and a separate `statusToken`. Poll the status URL with the token in the `x-status-token` header. That keeps the token out of URLs.
 
 ```bash
 curl http://localhost:3000/api/payment-links/<id>/status \
@@ -114,6 +114,6 @@ curl http://localhost:3000/api/payment-links/<id>/status \
 
 ## Next steps
 
-- [Payment links](../guides/payment-links.md) — fiat quotes, idempotency, cancellation, and renewal.
-- [Webhooks](../guides/webhooks.md) — verify signed events in your application.
-- [Docker deployment](../guides/docker-deployment.md) — ports, volumes, and putting a TLS proxy in front.
+- [Payment links](../guides/payment-links.md): fiat quotes, idempotency, cancellation, and renewal.
+- [Webhooks](../guides/webhooks.md): verify signed events in your application.
+- [Docker deployment](../guides/docker-deployment.md): ports, volumes, and putting a TLS proxy in front.

@@ -4,7 +4,7 @@ icon: lucide/braces
 
 # Types
 
-These types describe the JSON bodies used by the API. They are written in TypeScript notation for readability — the service itself is TypeScript, and the source of truth is [`src/lib`](https://github.com/ribaunt/pay/tree/main/src/lib).
+These types describe the JSON bodies used by the API. They are written in TypeScript notation for readability. The service itself is TypeScript, and the source of truth is [`src/lib`](https://github.com/ribaunt/pay/tree/main/src/lib).
 
 ## Payment links
 
@@ -226,7 +226,7 @@ type ApiError = { error: string };
 
 ## Raw RPC types
 
-Internal types used by `src/lib/monero/types.ts`. They are not exposed directly by the HTTP API, but they explain field names in wallet responses.
+Internal types used by `src/lib/monero/types.ts`. They aren't exposed directly by the HTTP API, but they explain field names in wallet responses.
 
 ```ts
 type AddressResult = {
