@@ -10,10 +10,27 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
+const HEALTH_TIMEOUT_MS = 4_000;
+
+/** Never let a busy wallet RPC hold the health endpoint open. */
+async function within<T>(promise: Promise<T>, fallback: T, ms = HEALTH_TIMEOUT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function GET() {
   const [db, walletRpc] = await Promise.all([
-    prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false),
-    walletRpcPing(),
+    within(prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false), false),
+    within(walletRpcPing(), false),
   ]);
 
   let daemon = false;
@@ -21,12 +38,17 @@ export async function GET() {
   let daemonHeight = 0;
 
   if (walletRpc) {
-    const results = await Promise.allSettled([getDaemonHeight(), getWalletHeight()]);
-    if (results[0].status === "fulfilled") {
+    const results = await Promise.allSettled([
+      within(getDaemonHeight(), 0),
+      within(getWalletHeight(), 0),
+    ]);
+    if (results[0].status === "fulfilled" && results[0].value > 0) {
       daemon = true;
       daemonHeight = results[0].value;
     }
-    if (results[1].status === "fulfilled") walletHeight = results[1].value;
+    if (results[1].status === "fulfilled" && results[1].value > 0) {
+      walletHeight = results[1].value;
+    }
   }
 
   const syncLag = Math.max(0, daemonHeight - walletHeight);
@@ -44,7 +66,7 @@ export async function GET() {
   setGauge("pay_wallet_height", walletHeight);
   setGauge("pay_daemon_height", daemonHeight);
   setGauge("pay_wallet_sync_lag_blocks", syncLag);
-  await collectBusinessMetrics();
+  await within(collectBusinessMetrics(), undefined, 1_500);
 
   const healthy = db && walletRpc && daemon;
 
