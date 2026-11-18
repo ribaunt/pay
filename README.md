@@ -170,7 +170,7 @@ Backups use AES-256-CBC with PBKDF2 and are created with `umask 077`. Keep `.env
 ## Tests
 
 ```bash
-npm test          # 111 tests, Node 24+ required for module mocks
+npm test          # 112 tests, Node 24+ required for module mocks
 npm run test:watch
 npm run test:integration   # against a running stack
 ```
@@ -184,3 +184,7 @@ CI runs unit tests, type-check, build and production audit on every push/PR, plu
 Covers amount conversion, digest auth, wallet logic, payment proofs, auth tokens, encryption, rate limiting, and production env validation, with RPC and Prisma mocked.
 
 Verified live: security headers, header-only cron secret, status token via header, non-root wallet RPC with no credentials in argv, encrypted backup/restore round-trip, and synced health. Logout increments the user's session version and invalidates older cookies.
+
+## License
+
+Ribaunt Pay is released under the [Apache License 2.0](LICENSE).

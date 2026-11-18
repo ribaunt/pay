@@ -76,6 +76,7 @@ flowchart LR
 - [Set up a wallet](guides/watch-only-wallet.md): what a view key can and can't do.
 - [Read the API overview](api/index.md): authentication, rate limits, and error format.
 - [Explore the data model](architecture/data-model.md): the types behind the endpoints.
+- [License](https://github.com/ribaunt/pay/blob/main/LICENSE): Apache License 2.0.
 
 !!! note "This site is for version 0.1.x"
     The API and configuration reference describe the code in [`ribaunt/pay`](https://github.com/ribaunt/pay). If you are running a different revision, check the repository for changes.
