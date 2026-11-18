@@ -1,0 +1,26 @@
+/* A few restrained tweaks on top of the Zensical theme. */
+
+.md-grid {
+  max-width: 1280px;
+}
+
+.md-typeset h1 {
+  letter-spacing: -0.02em;
+}
+
+/* Home page cards react gently to pointer hover. */
+.md-typeset .grid.cards > ul > li {
+  border-radius: 12px;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--md-primary-fg-color);
+  transform: translateY(-2px);
+}
+
+/* Code should breathe a little more. */
+.md-typeset pre > code {
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
