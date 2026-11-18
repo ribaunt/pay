@@ -38,7 +38,7 @@ curl -X POST http://localhost:3000/api/wallet/setup \
 
 The restore height is the block where the wallet was created. It tells the RPC where to start scanning. A value of `0` scans from genesis and can take a very long time. If you don't know the exact height, use an earlier block that you know is safe. Scanning extra blocks is harmless, just slower.
 
-The app tries to move the scan cursor with `rescan_blockchain` when a non-zero restore height is supplied. If that call fails, setup still succeeds and the wallet continues from its current height.
+The restore height is passed to Monero when the watch-only wallet is created. The app does not call `rescan_blockchain` afterwards: that call blocks `monero-wallet-rpc` for minutes and makes the app unresponsive. If Monero does not honour the height, the wallet continues from its current height.
 
 ### Network rules
 
@@ -49,7 +49,7 @@ Addresses are checked against `MONERO_NETWORK`:
 | `mainnet` | starts with `4` | starts with `8` |
 | `stagenet` | starts with `5` | starts with `7` |
 
-Addresses must be 95 characters long. A mismatched address is rejected before any wallet file is created.
+Addresses must be 95 characters long. A mismatched address or view key is rejected after the generated wallet is reopened for validation; no wallet files are kept and no database record is saved.
 
 ## What gets stored
 
