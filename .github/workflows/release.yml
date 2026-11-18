@@ -158,6 +158,13 @@ jobs:
           pattern: release-*
           path: artifacts
 
+      - name: Name digests uniquely
+        run: |
+          for f in artifacts/*/digest.txt; do
+            asset="$(basename "$(dirname "$f")")"
+            mv "$f" "$(dirname "$f")/${asset}.digest.txt"
+          done
+
       - name: Build release notes
         env:
           REGISTRY: ${{ env.REGISTRY }}
@@ -168,8 +175,9 @@ jobs:
             echo
             echo "## Images"
             echo
-            for f in artifacts/*/digest.txt; do
+            for f in artifacts/*/*.digest.txt; do
               name="$(basename "$(dirname "$f")")"
+              name="${name#release-}"
               digest="$(cat "$f")"
               echo "- \`${REGISTRY}/${OWNER}/${name}@${digest}\`"
             done
@@ -185,7 +193,7 @@ jobs:
 
       - name: Build checksums
         run: |
-          find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name 'digest.txt' \) -print | sort > /tmp/asset-files
+          find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name '*.digest.txt' \) -print | sort > /tmp/asset-files
           {
             echo release/install.sh
             echo release/compose.yml
@@ -204,4 +212,4 @@ jobs:
             release/compose.yml \
             release/README.md \
             checksums.txt \
-            $(find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name 'digest.txt' \) -print | sort)
+            $(find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name '*.digest.txt' \) -print | sort)
