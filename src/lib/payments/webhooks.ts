@@ -195,6 +195,7 @@ export async function dispatchWebhooks() {
         });
         failed += 1;
         inc("pay_webhook_failures_total", { event: delivery.event });
+        inc("pay_webhook_retries_total", { event: delivery.event });
       } else {
         await prisma.webhookDelivery.update({
           where: { id: delivery.id },
@@ -205,6 +206,7 @@ export async function dispatchWebhooks() {
             nextRetryAt: new Date(Date.now() + 2 ** attempts * 1000),
           },
         });
+        inc("pay_webhook_retries_total", { event: delivery.event });
         failed += 1;
         inc("pay_webhook_failures_total", { event: delivery.event });
       }
@@ -221,6 +223,7 @@ export async function dispatchWebhooks() {
       });
       failed += 1;
       inc("pay_webhook_failures_total", { event: delivery.event });
+      if (attempts < 6) inc("pay_webhook_retries_total", { event: delivery.event });
     }
   }
 

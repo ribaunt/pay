@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { ConflictError } from "@/lib/api-response";
 import { getPaymentConfig } from "@/lib/config";
-import { inc } from "@/lib/metrics";
+import { inc, observe } from "@/lib/metrics";
 import { SINGLE_USER_ID } from "@/lib/auth";
 import { optionalLabel } from "@/lib/validation";
 import { atomicToXmr, xmrToAtomic } from "@/lib/monero/money";
@@ -373,6 +373,19 @@ export async function listPaymentLinks(status?: string) {
 }
 
 export async function settlePaymentLinks() {
+  const started = process.hrtime.bigint();
+  try {
+    return await settlePaymentLinksInner();
+  } finally {
+    observe(
+      "pay_settlement_duration_seconds",
+      Number(process.hrtime.bigint() - started) / 1e9
+    );
+    inc("pay_settlement_runs_total");
+  }
+}
+
+async function settlePaymentLinksInner() {
   const defaultConfirmations = getPaymentConfig().requiredConfirmations;
 
   const active = await prisma.paymentRequest.findMany({

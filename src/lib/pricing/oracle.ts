@@ -172,12 +172,16 @@ export async function getPriceQuote(currencyInput: string): Promise<PriceQuote> 
 
   const config = getPriceConfig();
   const cached = cache.get(currency);
-  if (cached && Date.now() - cached.cachedAt <= config.cacheTtlMs) return cached.quote;
+  if (cached && Date.now() - cached.cachedAt <= config.cacheTtlMs) {
+    setGauge("pay_price_age_seconds", (Date.now() - cached.cachedAt) / 1000, { currency });
+    return cached.quote;
+  }
 
   try {
     const [sources, fx] = await Promise.all([usdPerXmrSources(), fiatPerUsd(currency)]);
     const { price, degraded } = aggregatePrices(sources.map((entry) => entry.value));
     setGauge("pay_price_sources_healthy", sources.length);
+    setGauge("pay_price_age_seconds", 0, { currency });
 
     const quote: PriceQuote = {
       currency,
