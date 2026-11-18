@@ -16,6 +16,7 @@ permissions:
   packages: write
   id-token: write
   attestations: write
+  actions: write
 
 env:
   REGISTRY: ghcr.io
@@ -224,3 +225,9 @@ jobs:
             release/README.md \
             checksums.txt \
             $(find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name '*.digest.txt' \) -print | sort)
+
+      # Releases created with GITHUB_TOKEN do not trigger other workflows.
+      - name: Refresh documentation site
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run docs.yml
