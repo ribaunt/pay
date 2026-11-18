@@ -1,66 +1,136 @@
 groups:
-  - name: pay
+  - name: pay-availability
     rules:
       - alert: PayDatabaseDown
         expr: pay_db_up == 0
         for: 1m
-        labels:
-          severity: critical
+        labels: { severity: critical }
         annotations:
           summary: Postgres is unreachable
 
       - alert: PayWalletRpcDown
         expr: pay_wallet_rpc_up == 0
         for: 1m
-        labels:
-          severity: critical
+        labels: { severity: critical }
         annotations:
           summary: monero-wallet-rpc is unreachable
 
       - alert: PayDaemonDown
         expr: pay_daemon_up == 0
         for: 2m
-        labels:
-          severity: warning
+        labels: { severity: warning }
         annotations:
           summary: Monero daemon is unreachable
 
+      - alert: PayAppProbeFailed
+        expr: max(probe_success{probe="pay-health"}) == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: Public health probe failed
+
+      - alert: PayMoneroDaemonProbeFailed
+        expr: max(probe_success{probe="monero-daemon"}) == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Monero daemon is unreachable from outside the container
+
+      - alert: PayScrapeTargetDown
+        expr: up == 0
+        for: 3m
+        labels: { severity: warning }
+        annotations:
+          summary: "Scrape target {{ $labels.instance }} is down"
+
+  - name: pay-sync
+    rules:
       - alert: PayWalletSyncLagHigh
         expr: pay_wallet_sync_lag_blocks > 10
         for: 5m
-        labels:
-          severity: warning
+        labels: { severity: warning }
         annotations:
           summary: Wallet is more than 10 blocks behind the daemon
 
+      - alert: PayWalletSyncStalled
+        expr: increase(pay_wallet_height[10m]) == 0 and pay_wallet_sync_lag_blocks > 100
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Wallet height has not advanced in 10 minutes
+
+  - name: pay-performance
+    rules:
+      - alert: PayHttpErrorRateHigh
+        expr: |
+          sum(rate(pay_http_requests_total{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(pay_http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: More than 5% of requests return 5xx
+
+      - alert: PayHttpLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le, route) (rate(pay_http_request_duration_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "p95 latency above 2s on {{ $labels.route }}"
+
+      - alert: PayEventLoopLagHigh
+        expr: nodejs_eventloop_lag_seconds{job="ribaunt-pay"} > 0.1
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Node event loop lag above 100ms
+
+      - alert: PayMemoryHigh
+        expr: process_resident_memory_bytes{job="ribaunt-pay"} > 536870912
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: App RSS above 512 MiB
+
+  - name: pay-business
+    rules:
       - alert: PayPriceSourcesDegraded
         expr: pay_price_sources_healthy < 2
         for: 5m
-        labels:
-          severity: warning
+        labels: { severity: warning }
         annotations:
-          summary: Fewer than two XMR price sources are healthy
+          summary: Fewer than two price sources are healthy
 
-      - alert: PayWebhookFailures
-        expr: rate(pay_webhook_failures_total[5m]) > 0.1
+      - alert: PayPriceStale
+        expr: pay_price_age_seconds > 300
         for: 5m
-        labels:
-          severity: warning
+        labels: { severity: warning }
         annotations:
-          summary: Webhook delivery failures are elevated
+          summary: "Price quote for {{ $labels.currency }} is older than 5 minutes"
 
       - alert: PaySettlementErrors
-        expr: increase(pay_settlement_errors_total[10m]) > 0
-        for: 0m
-        labels:
-          severity: warning
-        annotations:
-          summary: Payment settlement failed
-
-      - alert: PayRateLimitHits
-        expr: rate(pay_rate_limit_hits_total[5m]) > 1
+        expr: increase(pay_settlement_errors_total[15m]) > 0
         for: 5m
-        labels:
-          severity: info
+        labels: { severity: critical }
         annotations:
-          summary: Rate limit hits are elevated
+          summary: Settlement job is failing
+
+      - alert: PayWebhookBacklog
+        expr: pay_webhook_queue{status="pending"} > 20
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: More than 20 webhook deliveries are queued
+
+      - alert: PayWebhookOverdue
+        expr: pay_webhook_overdue > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: Webhook deliveries are past their retry time
+
+      - alert: PayPendingLinkAging
+        expr: pay_oldest_pending_link_age_seconds > 1500
+        for: 5m
+        labels: { severity: info }
+        annotations:
+          summary: Oldest pending payment link is over 25 minutes old
