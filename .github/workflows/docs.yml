@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  release:
+    types:
+      - published
   workflow_dispatch:
 
 permissions:
@@ -26,6 +29,14 @@ jobs:
           python-version: "3.x"
       - run: pip install zensical==0.1.2
       - run: zensical build --clean --strict
+      - name: Publish installer with the latest release version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp release/install.sh site/install.sh
+          chmod 644 site/install.sh
+          VERSION="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>/dev/null || echo latest)"
+          printf '%s\n' "$VERSION" > site/install.version
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

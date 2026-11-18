@@ -3,7 +3,16 @@
 # Usage: curl -fsSL https://pay.ribaunt.com/install.sh | sh
 set -eu
 
-VERSION="${PAY_VERSION:-latest}"
+REPO="${PAY_REPO:-ribaunt/pay}"
+
+# Default to the newest published release so a downloaded copy of this script
+# never pins an old version. PAY_VERSION still overrides it for testing.
+VERSION="${PAY_VERSION:-}"
+if [ -z "$VERSION" ]; then
+  VERSION="$(curl -fsSL --max-time 10 "https://api.github.com/repos/${REPO}/releases/latest" \
+    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)" || true
+fi
+VERSION="${VERSION:-latest}"
 IMAGE="ghcr.io/ribaunt/pay:${VERSION}"
 
 command -v docker >/dev/null 2>&1 || {

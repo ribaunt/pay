@@ -22,7 +22,7 @@ Each release tag publishes `vX.Y.Z`, `X.Y.Z`, and `latest` tags for `linux/amd64
 curl -fsSL https://pay.ribaunt.com/install.sh | sh
 ```
 
-The installer prompts for your Monero daemon address, creates the `pay-data` volume, pulls the image, and starts the container. First-run credentials are printed once to `docker logs pay`.
+The installer prompts for your Monero daemon address, creates the `pay-data` volume, pulls the image, and starts the container. First-run credentials are printed once to `docker logs pay`. It resolves the newest release automatically; set `PAY_VERSION` to pin a different version. This copy is published with the docs site on every release.
 
 Manual install:
 
