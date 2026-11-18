@@ -1,0 +1,21 @@
+services:
+  pay:
+    image: ghcr.io/ribaunt/pay:${PAY_VERSION:-latest}
+    container_name: pay
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      MONERO_NETWORK: ${MONERO_NETWORK:-mainnet}
+      MONERO_DAEMON_ADDRESS: ${MONERO_DAEMON_ADDRESS:?set MONERO_DAEMON_ADDRESS}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+    volumes:
+      - pay-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pay-data:

@@ -1,0 +1,102 @@
+# syntax=docker/dockerfile:1
+# All-in-one appliance: Next.js app + PostgreSQL 16 + verified monero-wallet-rpc.
+# One container, one /data volume. No monerod is bundled.
+
+ARG NODE_IMAGE=node@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
+ARG POSTGRES_IMAGE=postgres@sha256:dd2bf3ce2dc83a81674cf7f217fcfd8a5009a4b325dda5b843bfee82a06cff6f
+ARG DEBIAN_IMAGE=debian@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+ARG MONERO_VERSION=v0.18.5.4
+ARG MONERO_SHA256_X64=ba2928962c101b609434bf8c1b43ad59ebe96c5525977284ca599d8bf0f02d10
+ARG MONERO_SHA256_ARM64=d20d71e6522b41eb8e549c3425f7f4622c9c9a448fc7147525393fd0a6b59703
+
+# ---------- dependencies ----------
+FROM ${NODE_IMAGE} AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci --ignore-scripts 2>/dev/null || npm install --ignore-scripts
+
+# ---------- app build ----------
+FROM ${NODE_IMAGE} AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npx prisma generate
+RUN npm run build
+RUN npm prune --omit=dev
+
+# ---------- verified monero-wallet-rpc binary ----------
+FROM ${DEBIAN_IMAGE} AS wallet-binary
+ARG MONERO_VERSION
+ARG MONERO_SHA256_X64
+ARG MONERO_SHA256_ARM64
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl bzip2 libssl3 gnupg \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN export GNUPGHOME=/tmp/gnupg \
+ && mkdir -m 700 "$GNUPGHOME" \
+ && curl -fsSL https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/binaryfate.asc | gpg --batch --import \
+ && curl -fsSL https://raw.githubusercontent.com/monero-project/monero/master/utils/gpg_keys/luigi1111.asc | gpg --batch --import \
+ && printf '%s\n' \
+    '81AC591FE9C4B65C5806AFC3F0AF4D462A0BDF92:6:' \
+    '8777AB8F778EE89487A2F8E7F4ACA0183641E010:6:' \
+    | gpg --batch --import-ownertrust \
+ && curl -fsSL -o /tmp/hashes.txt https://www.getmonero.org/downloads/hashes.txt \
+ && curl -fsSL -o /tmp/hashes.txt.sig https://www.getmonero.org/downloads/hashes.txt.sig \
+ && gpg --batch --verify /tmp/hashes.txt.sig /tmp/hashes.txt
+
+RUN ARCH="$(uname -m)"; \
+    case "${ARCH}" in \
+      x86_64) FILE="monero-linux-x64-${MONERO_VERSION}.tar.bz2"; EXPECTED="${MONERO_SHA256_X64}"; URL="https://downloads.getmonero.org/cli/linux64" ;; \
+      aarch64) FILE="monero-linux-armv8-${MONERO_VERSION}.tar.bz2"; EXPECTED="${MONERO_SHA256_ARM64}"; URL="https://downloads.getmonero.org/cli/linuxarm8" ;; \
+      *) echo "Unsupported architecture: ${ARCH}" >&2; exit 1 ;; \
+    esac; \
+    grep -q "${EXPECTED}  ${FILE}" /tmp/hashes.txt \
+ && curl -fsSL -o /tmp/monero.tar.bz2 "${URL}" \
+ && echo "${EXPECTED}  /tmp/monero.tar.bz2" | sha256sum -c - \
+ && mkdir -p /opt/monero \
+ && tar -xjf /tmp/monero.tar.bz2 -C /opt/monero --strip-components=1 \
+ && find /opt/monero -maxdepth 1 -type f ! -name monero-wallet-rpc -delete \
+ && chmod +x /opt/monero/monero-wallet-rpc
+
+# ---------- appliance runtime ----------
+FROM ${POSTGRES_IMAGE} AS runner
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates curl openssl libssl3 gosu dumb-init \
+ && rm -rf /var/lib/apt/lists/* \
+ && addgroup --system --gid 10001 monero \
+ && adduser --system --uid 10001 --ingroup monero monero \
+ && addgroup --system --gid 1001 nextjs \
+ && adduser --system --uid 1001 --ingroup nextjs nextjs \
+ && mkdir -p /data/postgres /data/wallets /data/config \
+ && chown -R postgres:postgres /data/postgres \
+ && chown -R monero:monero /data/wallets \
+ && chown -R nextjs:nextjs /data/config
+
+COPY --from=deps /usr/local/bin/node /usr/local/bin/node
+ENV PATH="/usr/local/bin:/usr/lib/postgresql/16/bin:${PATH}"
+
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV DO_NOT_TRACK=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+ENV MONERO_NETWORK=mainnet
+ENV MONERO_WALLET_RPC_URL=http://127.0.0.1:18082
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nextjs /app/node_modules ./node_modules
+COPY --from=wallet-binary /opt/monero/monero-wallet-rpc /usr/local/bin/monero-wallet-rpc
+COPY scripts/appliance-entrypoint.sh /usr/local/bin/appliance-entrypoint.sh
+RUN chmod +x /usr/local/bin/appliance-entrypoint.sh /usr/local/bin/monero-wallet-rpc
+
+VOLUME ["/data"]
+EXPOSE 3000
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "/usr/local/bin/appliance-entrypoint.sh"]

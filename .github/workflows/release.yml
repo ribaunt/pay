@@ -1,0 +1,207 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release tag, e.g. v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
+env:
+  REGISTRY: ghcr.io
+  NODE_IMAGE: node@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
+  POSTGRES_IMAGE: postgres@sha256:dd2bf3ce2dc83a81674cf7f217fcfd8a5009a4b325dda5b843bfee82a06cff6f
+  DEBIAN_IMAGE: debian@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run lint
+      - run: npm run build
+      - run: npm audit --audit-level=high
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+      - run: pip install zensical==0.1.2
+      - run: zensical build --clean --strict
+
+  images:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: pay-app
+            image: pay-app
+            dockerfile: Dockerfile
+          - name: pay-wallet-rpc
+            image: pay-wallet-rpc
+            dockerfile: Dockerfile.wallet
+          - name: pay
+            image: pay
+            dockerfile: Dockerfile.appliance
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            NODE_IMAGE=${{ env.NODE_IMAGE }}
+            POSTGRES_IMAGE=${{ env.POSTGRES_IMAGE }}
+            DEBIAN_IMAGE=${{ env.DEBIAN_IMAGE }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.version.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.version.outputs.value }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.version.outputs.value }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Install signing tools
+        run: |
+          curl -fsSL -o /tmp/syft.tar.gz https://github.com/anchore/syft/releases/download/v1.57.2/syft_1.57.2_linux_amd64.tar.gz
+          echo "17cc40c1e40dbfdeb8c84b6d9928909bceb793f22e8a8023ef408625f1d96ec5  /tmp/syft.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/syft.tar.gz -C /usr/local/bin syft
+          curl -fsSL -o /usr/local/bin/cosign https://github.com/sigstore/cosign/releases/download/v3.1.4/cosign-linux-amd64
+          echo "424e2c97d0b45fd7a6b608a87f090f35633f4c23ece5f092d48bba11aaf4bbfa  /usr/local/bin/cosign" | sha256sum -c -
+          chmod +x /usr/local/bin/cosign /usr/local/bin/syft
+
+      - name: Sign image
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+        run: |
+          DIGEST="${{ steps.build.outputs.digest }}"
+          echo "$DIGEST" > digest.txt
+          cosign sign --yes "$IMAGE@$DIGEST"
+
+      - name: Generate and sign SBOM
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+        run: |
+          DIGEST="${{ steps.build.outputs.digest }}"
+          syft "$IMAGE@$DIGEST" -o spdx-json="${{ matrix.name }}.spdx.json"
+          cosign sign-blob --yes --bundle "${{ matrix.name }}.bundle" "${{ matrix.name }}.spdx.json"
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            digest.txt
+            ${{ matrix.name }}.spdx.json
+            ${{ matrix.name }}.bundle
+
+  release:
+    needs: images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: artifacts
+
+      - name: Build release notes
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          {
+            echo "# Ribaunt Pay ${{ steps.version.outputs.tag }}"
+            echo
+            echo "## Images"
+            echo
+            for f in artifacts/*/digest.txt; do
+              name="$(basename "$(dirname "$f")")"
+              digest="$(cat "$f")"
+              echo "- \`${REGISTRY}/${OWNER}/${name}@${digest}\`"
+            done
+            echo
+            echo "## Install"
+            echo
+            echo '```bash'
+            echo "PAY_VERSION=${{ steps.version.outputs.tag }} sh -c \"\$(curl -fsSL https://pay.ribaunt.com/install.sh)\""
+            echo '```'
+            echo
+            echo "All images are signed with cosign and include SPDX SBOMs and build provenance."
+          } > release-notes.md
+
+      - name: Build checksums
+        run: |
+          find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name 'digest.txt' \) -print | sort > /tmp/asset-files
+          {
+            echo release/install.sh
+            echo release/compose.yml
+            echo release/README.md
+          } >> /tmp/asset-files
+          sha256sum $(cat /tmp/asset-files) > checksums.txt
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file release-notes.md \
+            release/install.sh \
+            release/compose.yml \
+            release/README.md \
+            checksums.txt \
+            $(find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name 'digest.txt' \) -print | sort)
