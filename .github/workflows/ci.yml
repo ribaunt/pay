@@ -20,6 +20,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
 
   artifacts:
+    needs: unit
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -66,6 +67,7 @@ jobs:
             wallet.bundle
 
   integration:
+    needs: unit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -129,3 +131,9 @@ jobs:
       - name: Stop stack
         if: always()
         run: docker compose down -v
+
+  checks:
+    needs: [unit, artifacts, integration]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All checks and artifacts succeeded"
