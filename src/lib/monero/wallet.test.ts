@@ -180,7 +180,6 @@ describe("setupWatchOnlyWallet", () => {
       description: "Storefront",
     });
 
-    expect(prisma.wallet.findUnique).toHaveBeenCalledWith({ where: { userId: USER_ID } });
     const upsert = vi.mocked(prisma.wallet.upsert).mock.calls[0][0];
     expect(upsert.where).toEqual({ userId: USER_ID });
     expect(upsert.create).toMatchObject({

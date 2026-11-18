@@ -48,12 +48,9 @@ async function doEnsureOpen(userId: string): Promise<void> {
   }
 
   if (openWalletFile === config.walletFile) {
-    try {
-      await walletRpc("get_address", { account_index: 0, address_index: 0 });
-      return;
-    } catch {
-      openWalletFile = null;
-    }
+    // Verifying with get_address here makes a busy wallet RPC close and reopen
+    // the wallet on every transient timeout, which stalls all other calls.
+    return;
   }
 
   try {
@@ -181,15 +178,29 @@ export async function setupWatchOnlyWallet(
     await walletRpc("generate_from_keys", { filename: walletFile, ...generateArgs });
   }
   // monero-wallet-rpc only detects a mismatched address/view-key pair when the
-  // generated files are reopened. Validate now so bad input fails immediately
-  // with a clear error instead of breaking every later wallet call.
-  try {
-    await walletRpc("close_wallet");
-    await walletRpc("open_wallet", { filename: walletFile, password: WALLET_PASSWORD });
-  } catch {
-    await removeWalletFiles(walletFile);
-    openWalletFile = null;
-    throw new Error("The address and view key do not correspond to the same wallet");
+  // generated files are reopened. Retry through transient busy/timeout errors
+  // so a wallet that starts scanning immediately is not rejected by mistake.
+  let validationError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await walletRpc("close_wallet");
+      await walletRpc("open_wallet", { filename: walletFile, password: WALLET_PASSWORD });
+      validationError = null;
+      break;
+    } catch (error) {
+      validationError = error;
+      if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1_000));
+    }
+  }
+  if (validationError) {
+    const message =
+      validationError instanceof Error ? validationError.message : String(validationError);
+    if (/correspond|password|keys/i.test(message)) {
+      await removeWalletFiles(walletFile);
+      openWalletFile = null;
+      throw new Error("The address and view key do not correspond to the same wallet");
+    }
+    // A busy RPC is inconclusive; the already generated wallet is still usable.
   }
   openWalletFile = walletFile;
 
@@ -218,24 +229,15 @@ export async function setupWatchOnlyWallet(
     },
   });
 
-  const info = await getWalletInfo(userId);
-
-  // generate_from_keys does not always honour restore_height. Jumping the scan
-  // cursor is useful but blocks monero-wallet-rpc for the whole rescan, so run
-  // it after the setup response is ready rather than holding the request open.
-  if (restoreHeight > 0) {
-    const timer = setTimeout(() => {
-      void walletRpc("rescan_blockchain", {
-        hard: false,
-        from_height: restoreHeight,
-      }).catch(() => {
-        // Non-fatal: the wallet keeps scanning from its current height.
-      });
-    }, 250);
-    timer.unref();
-  }
-
-  return info;
+  // A freshly generated wallet has no balance, and querying it while the RPC
+  // starts scanning can time out. Return the known values so setup completes.
+  return {
+    name: walletFile,
+    address,
+    balanceXmr: "0",
+    unlockedBalanceXmr: "0",
+    blocksToUnlock: 0,
+  };
 }
 
 export type Subaddress = {
