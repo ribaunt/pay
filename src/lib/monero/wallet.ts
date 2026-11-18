@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { readdir, unlink } from "node:fs/promises";
+import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
 import { SINGLE_USER_ID } from "@/lib/auth";
 import { getMoneroNetwork } from "./network";
@@ -119,6 +121,21 @@ export async function getWalletInfo(userId: string): Promise<WalletInfo> {
  * key embedded in the primary address are used — no spend key is requested.
  * The view key is encrypted before it touches Postgres.
  */
+/** Best-effort cleanup of files produced by a rejected keypair. */
+async function removeWalletFiles(walletFile: string): Promise<void> {
+  const dir = process.env.MONERO_WALLET_DIR ?? "/data/wallets";
+  try {
+    const files = await readdir(dir);
+    await Promise.all(
+      files
+        .filter((name) => name === walletFile || name.startsWith(`${walletFile}.`))
+        .map((name) => unlink(join(dir, name)).catch(() => {}))
+    );
+  } catch {
+    // The wallet directory may be managed elsewhere; cleanup is best effort.
+  }
+}
+
 export async function setupWatchOnlyWallet(
   userId: string,
   options: {
@@ -163,20 +180,18 @@ export async function setupWatchOnlyWallet(
     walletFile = `${walletFile}-${Date.now().toString(36)}`;
     await walletRpc("generate_from_keys", { filename: walletFile, ...generateArgs });
   }
-  openWalletFile = walletFile;
-
-  // generate_from_keys does not always honour restore_height; explicitly jump
-  // the wallet scan cursor when a real restore height was provided.
-  if (restoreHeight > 0) {
-    try {
-      await walletRpc("rescan_blockchain", {
-        hard: false,
-        from_height: restoreHeight,
-      });
-    } catch {
-      // Non-fatal: the wallet will continue scanning from its current height.
-    }
+  // monero-wallet-rpc only detects a mismatched address/view-key pair when the
+  // generated files are reopened. Validate now so bad input fails immediately
+  // with a clear error instead of breaking every later wallet call.
+  try {
+    await walletRpc("close_wallet");
+    await walletRpc("open_wallet", { filename: walletFile, password: WALLET_PASSWORD });
+  } catch {
+    await removeWalletFiles(walletFile);
+    openWalletFile = null;
+    throw new Error("The address and view key do not correspond to the same wallet");
   }
+  openWalletFile = walletFile;
 
   const encryptedViewKey = encryptSecret(viewKey);
 
@@ -203,7 +218,24 @@ export async function setupWatchOnlyWallet(
     },
   });
 
-  return getWalletInfo(userId);
+  const info = await getWalletInfo(userId);
+
+  // generate_from_keys does not always honour restore_height. Jumping the scan
+  // cursor is useful but blocks monero-wallet-rpc for the whole rescan, so run
+  // it after the setup response is ready rather than holding the request open.
+  if (restoreHeight > 0) {
+    const timer = setTimeout(() => {
+      void walletRpc("rescan_blockchain", {
+        hard: false,
+        from_height: restoreHeight,
+      }).catch(() => {
+        // Non-fatal: the wallet keeps scanning from its current height.
+      });
+    }, 250);
+    timer.unref();
+  }
+
+  return info;
 }
 
 export type Subaddress = {

@@ -96,6 +96,7 @@ beforeEach(() => {
     get_address: addressResponse,
     get_balance: balanceResponse,
     close_wallet: {},
+    open_wallet: {},
     generate_from_keys: {},
     rescan_blockchain: {},
   });
@@ -155,6 +156,21 @@ describe("setupWatchOnlyWallet", () => {
       balanceXmr: "0",
       unlockedBalanceXmr: "0",
     });
+  });
+
+  it("rejects a keypair whose generated files cannot be reopened", async () => {
+    rpc.mockImplementation(async (method: string) => {
+      if (method === "open_wallet") throw new Error("file does not correspond to .keys");
+      if (method === "close_wallet" || method === "generate_from_keys") return {} as never;
+      if (method === "get_address") return addressResponse as never;
+      if (method === "get_balance") return balanceResponse as never;
+      throw new Error(`Unexpected RPC method: ${method}`);
+    });
+
+    await expect(
+      setupWatchOnlyWallet(USER_ID, { address: PRIMARY_ADDRESS, viewKey: VIEW_KEY })
+    ).rejects.toThrow("do not correspond");
+    expect(prisma.wallet.upsert).not.toHaveBeenCalled();
   });
 
   it("encrypts the view key and scopes the wallet to the user", async () => {
