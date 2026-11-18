@@ -9,6 +9,9 @@ CONFIG_FILE="$DATA_DIR/config/.env"
 mkdir -p "$PGDATA" "$WALLETS" "$DATA_DIR/config"
 chown -R postgres:postgres "$PGDATA"
 chown -R monero:monero "$WALLETS"
+# The app needs directory write access to remove files from a rejected keypair.
+chgrp nextjs "$WALLETS"
+chmod 770 "$WALLETS"
 chown -R nextjs:nextjs "$DATA_DIR/config"
 
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -45,6 +48,7 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=pay
 PAYMENT_API_KEY=${PAYMENT_API_KEY}
 CRON_SECRET=${CRON_SECRET}
+CRON_INTERVAL_SECONDS=${CRON_INTERVAL_SECONDS:-300}
 BACKUP_PASSPHRASE=${BACKUP_PASSPHRASE}
 EOF
 
@@ -121,8 +125,23 @@ gosu nextjs env HOME=/app ./node_modules/.bin/prisma migrate deploy
 gosu nextjs env HOME=/app node server.js &
 APP_PID=$!
 
+# Settlement and webhook retries are cron endpoints; run them on a timer so
+# the appliance does not depend on an external scheduler.
+CRON_INTERVAL="${CRON_INTERVAL_SECONDS:-300}"
+(
+  while true; do
+    sleep "$CRON_INTERVAL"
+    curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/payment-links \
+      -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
+    curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/webhooks \
+      -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
+  done
+) &
+CRON_PID=$!
+
 cleanup() {
   kill "$APP_PID" 2>/dev/null || true
+  kill "$CRON_PID" 2>/dev/null || true
   kill "$RPC_PID" 2>/dev/null || true
   gosu postgres pg_ctl -D "$PGDATA" -m fast stop >/dev/null 2>&1 || true
 }
