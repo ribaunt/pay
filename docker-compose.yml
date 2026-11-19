@@ -88,9 +88,9 @@ services:
       - |
         ./node_modules/.bin/prisma migrate deploy
         node server.js &
-        SERVER_PID=$!
+        SERVER_PID=$$!
         node scripts/bootstrap-wallet.mjs || true
-        wait "$SERVER_PID"
+        wait "$$SERVER_PID"
 
   # No host port: reachable only from the app over the internal compose network.
   # No monerod is bundled — point MONERO_DAEMON_ADDRESS at your own node.
@@ -316,9 +316,9 @@ services:
       - |
         ./node_modules/.bin/prisma migrate deploy
         node server.js &
-        SERVER_PID=$!
+        SERVER_PID=$$!
         node scripts/bootstrap-wallet.mjs || true
-        wait "$SERVER_PID"
+        wait "$$SERVER_PID"
 
   wallet-rpc-onion:
     profiles: ["tor-only"]
@@ -432,9 +432,9 @@ services:
       - |
         ./node_modules/.bin/prisma migrate deploy
         node server.js &
-        SERVER_PID=$!
+        SERVER_PID=$$!
         node scripts/bootstrap-wallet.mjs || true
-        wait "$SERVER_PID"
+        wait "$$SERVER_PID"
 
   wallet-rpc-i2p:
     profiles: ["i2p-only"]
