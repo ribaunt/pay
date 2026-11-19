@@ -70,10 +70,8 @@ This writes a migration under `prisma/migrations/`. The production container run
 ```text
 src/
 ├── app/
-│   ├── api/                 # Route handlers, one folder per endpoint
-│   ├── login/, setup/       # The two UI pages
-│   └── layout.tsx
-├── components/
+│   └── api/                 # Route handlers, one folder per endpoint
+├── instrumentation.ts       # HTTP metrics and process gauges
 └── lib/
     ├── monero/              # RPC client, digest auth, money, network, wallet
     ├── payments/            # Links, settlement, API keys, webhooks, audit

@@ -13,14 +13,18 @@ A private view key lets the wallet see incoming outputs and their amounts. It ca
 !!! warning "Treat the view key as sensitive"
     It doesn't allow spending, but it does expose your transaction history to anyone who has it. Store it in `.env`-grade secrecy and never paste it into a public issue or chat.
 
-## Set up through the UI
+## Set up with environment variables
 
-1. Sign in at `/login` with the credentials from `.env`.
-2. Open `/setup`.
-3. Enter the primary address, the 64-character hex view key, and a restore height.
-4. Submit. The page shows the watch-only address when the wallet is ready.
+The normal path is to set these values in `.env` before starting the stack. The container imports the wallet automatically on first boot and skips the step if a wallet is already configured.
 
-The equivalent API call is:
+```dotenv
+MONERO_WALLET_ADDRESS=4...
+MONERO_WALLET_VIEW_KEY=<64 hex characters>
+MONERO_WALLET_RESTORE_HEIGHT=3200000
+MONERO_WALLET_DESCRIPTION=Storefront
+```
+
+The same import is available through the API if you need to replace a wallet later:
 
 ```bash
 curl -X POST http://localhost:3000/api/wallet/setup \

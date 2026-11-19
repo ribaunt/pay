@@ -16,7 +16,18 @@ Ribaunt Pay is published as signed, multi-architecture container images.
 
 Each release tag publishes `vX.Y.Z`, `X.Y.Z`, and `latest` tags for `linux/amd64` and `linux/arm64`.
 
-## Install the appliance
+## Install with Compose
+
+The docs site serves a Compose file pinned to the newest release and a matching environment template:
+
+```bash
+curl -fsSL https://pay.ribaunt.com/compose.yml -o compose.yml
+curl -fsSL https://pay.ribaunt.com/.env.example -o .env
+chmod 600 .env
+docker compose up -d
+```
+
+## Install the appliance without Compose
 
 ```bash
 curl -fsSL https://pay.ribaunt.com/install.sh | sh

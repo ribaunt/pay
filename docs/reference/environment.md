@@ -45,6 +45,10 @@ Generate random values with `openssl rand -hex 32` or your password manager. Don
 | `MONERO_RPC_USER` | `monero` | **yes** | Digest username for `monero-wallet-rpc`. |
 | `MONERO_RPC_PASSWORD` | none | **yes** | At least 16 characters. |
 | `MONERO_WALLET_PASSWORD` | none | **yes** | At least 16 characters; encrypts wallet files. |
+| `MONERO_WALLET_ADDRESS` | empty | no | Primary address imported automatically on first boot. |
+| `MONERO_WALLET_VIEW_KEY` | empty | no | Private view key for the address above. Never log or commit it. |
+| `MONERO_WALLET_RESTORE_HEIGHT` | `0` | no | Starting block for scanning; `0` scans from genesis. |
+| `MONERO_WALLET_DESCRIPTION` | empty | no | Optional label stored with the wallet. |
 | `MONERO_WALLET_RPC_URL` | `http://localhost:18082` | no | Set to `http://wallet-rpc:18082` by Compose. |
 
 ## Payments and pricing

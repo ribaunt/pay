@@ -8,6 +8,8 @@ These endpoints read and configure the watch-only wallet. Most require a session
 
 ## Set up the wallet
 
+Normally the wallet is imported on first boot from `MONERO_WALLET_ADDRESS`, `MONERO_WALLET_VIEW_KEY`, and `MONERO_WALLET_RESTORE_HEIGHT`. The API below is for replacing an existing wallet or for deployments that don't set those variables.
+
 `POST /api/wallet/setup` needs a session and allows 5 calls per minute.
 
 ```bash

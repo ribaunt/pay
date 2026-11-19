@@ -17,10 +17,26 @@ Full documentation: **[pay.ribaunt.com](https://pay.ribaunt.com)** — installat
 
 ## Run with Docker
 
+The published image is the normal way to run Ribaunt Pay:
+
 ```bash
+curl -fsSL https://pay.ribaunt.com/compose.yml -o compose.yml
+curl -fsSL https://pay.ribaunt.com/.env.example -o .env
+chmod 600 .env
+# fill in MONERO_DAEMON_ADDRESS, MONERO_NETWORK and the MONERO_WALLET_* values
+docker compose up -d
+docker logs pay        # one-time sign-in credentials on first boot
+curl http://localhost:3000/api/health
+```
+
+The Compose file pins the latest release image. Set `PAY_VERSION` in `.env` to choose another version. There is no web UI — everything else is API-driven.
+
+To run from source instead (development or custom Tor/I2P profiles):
+
+```bash
+git clone https://github.com/ribaunt/pay.git
+cd pay
 cp .env.example .env
-# fill in SINGLE_USER_EMAIL, SINGLE_USER_PASSWORD, PAYMENT_API_KEY, CRON_SECRET,
-# SESSION_SECRET, WALLET_ENCRYPTION_KEY, MONERO_RPC_PASSWORD, MONERO_WALLET_PASSWORD
 chmod 600 .env
 docker compose up --build
 ```
@@ -112,18 +128,13 @@ The `tor` profile starts a hidden service pointing at the app. It publishes no S
 
 ## Watch-only setup
 
-After opening a session, visit http://localhost:3000/setup and enter:
-- your wallet's **primary address**
-- its **private view key**
-- the **restore height** (block height when the wallet was created; `0` scans from genesis and is slow)
-
-Spend keys are never requested, sent, or stored.
+Set `MONERO_WALLET_ADDRESS`, `MONERO_WALLET_VIEW_KEY` and optionally `MONERO_WALLET_RESTORE_HEIGHT` in `.env`. The wallet is imported automatically on first boot. Spend keys are never requested, sent, or stored. The same import is available later through `POST /api/wallet/setup`.
 
 ## API
 
 Public:
 - `GET /api/health` — status of Postgres and wallet RPC
-- `GET /api/payment-links/[id]/status?token=...` — payment status
+- `GET /api/payment-links/[id]/status` with `x-status-token: <token>` — payment status
 - `POST /api/auth/login` — sign in with `.env` credentials
 - `POST /api/auth/logout`
 - `GET /api/auth/me` — current session info

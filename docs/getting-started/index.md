@@ -55,4 +55,4 @@ You need three things:
                          →  postgres :5432
 ```
 
-After the stack is healthy, you sign in once with the credentials from `.env`, visit `/setup`, and paste the address and view key. You do everything else through the API: creating links, watching payments, and delivering webhooks.
+Set the wallet address and view key in `.env` before starting; the container imports the watch-only wallet on first boot. There is no web UI — creating links, watching payments, and delivering webhooks are all done through the API.
