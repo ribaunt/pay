@@ -37,6 +37,10 @@ WALLET_ENCRYPTION_KEY=${WALLET_ENCRYPTION_KEY}
 MONERO_RPC_USER=monero
 MONERO_RPC_PASSWORD=${MONERO_RPC_PASSWORD}
 MONERO_WALLET_PASSWORD=${MONERO_WALLET_PASSWORD}
+MONERO_WALLET_ADDRESS=${MONERO_WALLET_ADDRESS:-}
+MONERO_WALLET_VIEW_KEY=${MONERO_WALLET_VIEW_KEY:-}
+MONERO_WALLET_RESTORE_HEIGHT=${MONERO_WALLET_RESTORE_HEIGHT:-0}
+MONERO_WALLET_DESCRIPTION=${MONERO_WALLET_DESCRIPTION:-}
 MONERO_NETWORK=${MONERO_NETWORK:-mainnet}
 MONERO_DAEMON_ADDRESS=${MONERO_DAEMON_ADDRESS:-}
 MONERO_DAEMON_MODE=full-scan
@@ -124,6 +128,9 @@ gosu nextjs env HOME=/app ./node_modules/.bin/prisma migrate deploy
 
 gosu nextjs env HOME=/app node server.js &
 APP_PID=$!
+
+# Import the watch-only wallet from the environment when provided.
+node /app/scripts/bootstrap-wallet.mjs || true
 
 # Settlement and webhook retries are cron endpoints; run them on a timer so
 # the appliance does not depend on an external scheduler.

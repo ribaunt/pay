@@ -50,6 +50,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pay}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-pay}?schema=public
       MONERO_WALLET_RPC_URL: http://wallet-rpc:18082
       MONERO_WALLET_PASSWORD: ${MONERO_WALLET_PASSWORD:?set MONERO_WALLET_PASSWORD in .env}
+      MONERO_WALLET_ADDRESS: ${MONERO_WALLET_ADDRESS:-}
+      MONERO_WALLET_VIEW_KEY: ${MONERO_WALLET_VIEW_KEY:-}
+      MONERO_WALLET_RESTORE_HEIGHT: ${MONERO_WALLET_RESTORE_HEIGHT:-0}
+      MONERO_WALLET_DESCRIPTION: ${MONERO_WALLET_DESCRIPTION:-}
       MONERO_RPC_USER: ${MONERO_RPC_USER:-monero}
       MONERO_RPC_PASSWORD: ${MONERO_RPC_PASSWORD:?set MONERO_RPC_PASSWORD in .env}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
@@ -78,7 +82,15 @@ services:
       PORT: "3000"
     ports:
       - "3000:3000"
-    command: ["/bin/sh", "-c", "./node_modules/.bin/prisma migrate deploy && node server.js"]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./node_modules/.bin/prisma migrate deploy
+        node server.js &
+        SERVER_PID=$!
+        node scripts/bootstrap-wallet.mjs || true
+        wait "$SERVER_PID"
 
   # No host port: reachable only from the app over the internal compose network.
   # No monerod is bundled — point MONERO_DAEMON_ADDRESS at your own node.
@@ -153,6 +165,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pay}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db-dev:5432/${POSTGRES_DB:-pay}?schema=public
       MONERO_WALLET_RPC_URL: http://wallet-rpc-dev:18082
       MONERO_WALLET_PASSWORD: ${MONERO_WALLET_PASSWORD:?set MONERO_WALLET_PASSWORD in .env}
+      MONERO_WALLET_ADDRESS: ${MONERO_WALLET_ADDRESS:-}
+      MONERO_WALLET_VIEW_KEY: ${MONERO_WALLET_VIEW_KEY:-}
+      MONERO_WALLET_RESTORE_HEIGHT: ${MONERO_WALLET_RESTORE_HEIGHT:-0}
+      MONERO_WALLET_DESCRIPTION: ${MONERO_WALLET_DESCRIPTION:-}
       MONERO_RPC_USER: ${MONERO_RPC_USER:-monero}
       MONERO_RPC_PASSWORD: ${MONERO_RPC_PASSWORD:?set MONERO_RPC_PASSWORD in .env}
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-at-least-32-characters-long}
@@ -270,6 +286,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pay}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db-onion:5432/${POSTGRES_DB:-pay}?schema=public
       MONERO_WALLET_RPC_URL: http://wallet-rpc-onion:18082
       MONERO_WALLET_PASSWORD: ${MONERO_WALLET_PASSWORD:?set MONERO_WALLET_PASSWORD in .env}
+      MONERO_WALLET_ADDRESS: ${MONERO_WALLET_ADDRESS:-}
+      MONERO_WALLET_VIEW_KEY: ${MONERO_WALLET_VIEW_KEY:-}
+      MONERO_WALLET_RESTORE_HEIGHT: ${MONERO_WALLET_RESTORE_HEIGHT:-0}
+      MONERO_WALLET_DESCRIPTION: ${MONERO_WALLET_DESCRIPTION:-}
       MONERO_RPC_USER: ${MONERO_RPC_USER:-monero}
       MONERO_RPC_PASSWORD: ${MONERO_RPC_PASSWORD:?set MONERO_RPC_PASSWORD in .env}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
@@ -290,7 +310,15 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       DO_NOT_TRACK: "1"
       PORT: "3000"
-    command: ["/bin/sh", "-c", "./node_modules/.bin/prisma migrate deploy && node server.js"]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./node_modules/.bin/prisma migrate deploy
+        node server.js &
+        SERVER_PID=$!
+        node scripts/bootstrap-wallet.mjs || true
+        wait "$SERVER_PID"
 
   wallet-rpc-onion:
     profiles: ["tor-only"]
@@ -374,6 +402,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-pay}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db-i2p:5432/${POSTGRES_DB:-pay}?schema=public
       MONERO_WALLET_RPC_URL: http://wallet-rpc-i2p:18082
       MONERO_WALLET_PASSWORD: ${MONERO_WALLET_PASSWORD:?set MONERO_WALLET_PASSWORD in .env}
+      MONERO_WALLET_ADDRESS: ${MONERO_WALLET_ADDRESS:-}
+      MONERO_WALLET_VIEW_KEY: ${MONERO_WALLET_VIEW_KEY:-}
+      MONERO_WALLET_RESTORE_HEIGHT: ${MONERO_WALLET_RESTORE_HEIGHT:-0}
+      MONERO_WALLET_DESCRIPTION: ${MONERO_WALLET_DESCRIPTION:-}
       MONERO_RPC_USER: ${MONERO_RPC_USER:-monero}
       MONERO_RPC_PASSWORD: ${MONERO_RPC_PASSWORD:?set MONERO_RPC_PASSWORD in .env}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
@@ -394,7 +426,15 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       DO_NOT_TRACK: "1"
       PORT: "3000"
-    command: ["/bin/sh", "-c", "./node_modules/.bin/prisma migrate deploy && node server.js"]
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./node_modules/.bin/prisma migrate deploy
+        node server.js &
+        SERVER_PID=$!
+        node scripts/bootstrap-wallet.mjs || true
+        wait "$SERVER_PID"
 
   wallet-rpc-i2p:
     profiles: ["i2p-only"]

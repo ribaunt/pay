@@ -39,6 +39,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts ./scripts
 # Production-only node_modules: Prisma client + CLI + engine binaries
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 

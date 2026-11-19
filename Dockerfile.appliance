@@ -91,6 +91,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nextjs /app/node_modules ./node_modules
 COPY --from=wallet-binary /opt/monero/monero-wallet-rpc /usr/local/bin/monero-wallet-rpc
 COPY scripts/appliance-entrypoint.sh /usr/local/bin/appliance-entrypoint.sh
