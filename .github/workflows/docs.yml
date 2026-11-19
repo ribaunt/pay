@@ -29,14 +29,16 @@ jobs:
           python-version: "3.x"
       - run: pip install zensical==0.1.2
       - run: zensical build --clean --strict
-      - name: Publish installer with the latest release version
+      - name: Publish installer and Compose files for the latest release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp release/install.sh site/install.sh
-          chmod 644 site/install.sh
+          cp release/pay.env.example site/.env.example
+          chmod 644 site/install.sh site/.env.example
           VERSION="$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>/dev/null || echo latest)"
           printf '%s\n' "$VERSION" > site/install.version
+          sed "s|PAY_VERSION:-latest|PAY_VERSION:-${VERSION}|" release/compose.yml > site/compose.yml
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site
