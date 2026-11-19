@@ -95,7 +95,7 @@ jobs:
           MONERO_RPC_PASSWORD=$(openssl rand -hex 24)
           MONERO_WALLET_PASSWORD=$(openssl rand -hex 24)
           MONERO_NETWORK=stagenet
-          MONERO_DAEMON_ADDRESS=xmr-lux.boldsuck.org:38081
+          MONERO_DAEMON_ADDRESS=stagenet.xmr-tw.org:38081
           SINGLE_USER_EMAIL=ci@example.com
           SINGLE_USER_PASSWORD=ci-password-at-least-12
           PAYMENT_API_KEY=${PAYMENT_API_KEY}
@@ -128,6 +128,9 @@ jobs:
           SINGLE_USER_PASSWORD: ci-password-at-least-12
           PAYMENT_API_KEY: ${{ env.PAYMENT_API_KEY }}
           CRON_SECRET: ${{ env.CRON_SECRET }}
+      - name: Log stack on failure
+        if: failure()
+        run: docker compose logs --tail=200
       - name: Stop stack
         if: always()
         run: docker compose down -v

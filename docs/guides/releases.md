@@ -22,7 +22,7 @@ The docs site serves a Compose file pinned to the newest release and a matching 
 
 ```bash
 curl -fsSL https://pay.ribaunt.com/compose.yml -o compose.yml
-curl -fsSL https://pay.ribaunt.com/.env.example -o .env
+curl -fsSL https://pay.ribaunt.com/env.example -o .env
 chmod 600 .env
 docker compose up -d
 ```

@@ -21,7 +21,7 @@ The published image is the normal way to run Ribaunt Pay:
 
 ```bash
 curl -fsSL https://pay.ribaunt.com/compose.yml -o compose.yml
-curl -fsSL https://pay.ribaunt.com/.env.example -o .env
+curl -fsSL https://pay.ribaunt.com/env.example -o .env
 chmod 600 .env
 # fill in MONERO_DAEMON_ADDRESS, MONERO_NETWORK and the MONERO_WALLET_* values
 docker compose up -d

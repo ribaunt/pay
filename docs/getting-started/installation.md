@@ -41,7 +41,7 @@ Download the Compose file and the example environment file. Both are generated f
 
 ```bash
 curl -fsSL https://pay.ribaunt.com/compose.yml -o compose.yml
-curl -fsSL https://pay.ribaunt.com/.env.example -o .env
+curl -fsSL https://pay.ribaunt.com/env.example -o .env
 chmod 600 .env
 ```
 

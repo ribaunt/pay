@@ -10,7 +10,7 @@ This gets the published Ribaunt Pay image running with Docker Compose in a few m
 
 ```bash
 curl -fsSL https://pay.ribaunt.com/compose.yml -o compose.yml
-curl -fsSL https://pay.ribaunt.com/.env.example -o .env
+curl -fsSL https://pay.ribaunt.com/env.example -o .env
 chmod 600 .env
 ```
 
