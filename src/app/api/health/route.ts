@@ -10,7 +10,10 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const HEALTH_TIMEOUT_MS = 4_000;
+// A busy wallet RPC (e.g. during initial full-scan sync) can take longer than
+// a few seconds to answer even get_version. Keep this generous so a live but
+// busy RPC is not reported as down.
+const HEALTH_TIMEOUT_MS = 20_000;
 
 /** Never let a busy wallet RPC hold the health endpoint open. */
 async function within<T>(promise: Promise<T>, fallback: T, ms = HEALTH_TIMEOUT_MS): Promise<T> {
@@ -61,10 +64,12 @@ export async function GET() {
         : "synced";
 
   setGauge("pay_db_up", db ? 1 : 0);
-  setGauge("pay_wallet_rpc_up", walletRpc ? 1 : 0);
-  setGauge("pay_daemon_up", daemon ? 1 : 0);
-  setGauge("pay_wallet_height", walletHeight);
-  setGauge("pay_daemon_height", daemonHeight);
+  // Keep the last good value on transient timeouts: a busy RPC is not a dead
+  // RPC, and zeroing these gauges makes dashboards flap during initial sync.
+  if (walletRpc) setGauge("pay_wallet_rpc_up", 1);
+  if (daemon) setGauge("pay_daemon_up", 1);
+  if (walletHeight > 0) setGauge("pay_wallet_height", walletHeight);
+  if (daemonHeight > 0) setGauge("pay_daemon_height", daemonHeight);
   setGauge("pay_wallet_sync_lag_blocks", syncLag);
   await within(collectBusinessMetrics(), undefined, 1_500);
 
