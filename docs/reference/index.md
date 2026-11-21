@@ -46,7 +46,7 @@ Lookup material for the values, types, and limits you encounter while working wi
 
 | Looking for… | Go to |
 | --- | --- |
-| The shape of a create-link response | [Types](types.md#createlinkresponse) |
+| The shape of a create-link response | [Types](types.md#paymentlink) |
 | Which secret must be at least 32 characters | [Environment variables](environment.md#production-validation) |
 | How many decimal places an XMR amount allows | [Monero concepts](monero-concepts.md#atomic-units) |
 | Why a request returned `409` | [Errors and limits](errors-and-limits.md#status-codes) |
