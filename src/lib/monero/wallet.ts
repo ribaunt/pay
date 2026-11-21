@@ -91,7 +91,9 @@ export type WalletInfo = {
   name: string;
   address: string;
   balanceXmr: string;
+  balanceAtomic: string;
   unlockedBalanceXmr: string;
+  unlockedBalanceAtomic: string;
   blocksToUnlock: number;
 };
 
@@ -108,7 +110,9 @@ export async function getWalletInfo(userId: string): Promise<WalletInfo> {
     name: config?.walletFile ?? openWalletFile ?? "unknown",
     address: addressResult.address,
     balanceXmr: atomicToXmr(balance.balance),
+    balanceAtomic: BigInt(balance.balance).toString(),
     unlockedBalanceXmr: atomicToXmr(balance.unlocked_balance),
+    unlockedBalanceAtomic: BigInt(balance.unlocked_balance).toString(),
     blocksToUnlock: balance.blocks_to_unlock,
   };
 }
@@ -235,7 +239,9 @@ export async function setupWatchOnlyWallet(
     name: walletFile,
     address,
     balanceXmr: "0",
+    balanceAtomic: "0",
     unlockedBalanceXmr: "0",
+    unlockedBalanceAtomic: "0",
     blocksToUnlock: 0,
   };
 }
@@ -448,10 +454,12 @@ export async function sendPayment(
 }
 
 export type NormalizedTransfer = {
-  txid: string;
+  txHash: string;
   type: string;
   amountXmr: string;
+  amountAtomic: string;
   feeXmr?: string;
+  feeAtomic?: string;
   timestamp: string;
   blockHeight: number;
   address?: string;
@@ -460,10 +468,13 @@ export type NormalizedTransfer = {
 
 function normalizeTransfer(entry: TransferEntry): NormalizedTransfer {
   return {
-    txid: entry.txid,
+    txHash: entry.txid,
     type: entry.type,
     amountXmr: atomicToXmr(entry.amount),
-    feeXmr: entry.fee !== undefined ? atomicToXmr(entry.fee) : undefined,
+    amountAtomic: BigInt(entry.amount).toString(),
+    ...(entry.fee !== undefined
+      ? { feeXmr: atomicToXmr(entry.fee), feeAtomic: BigInt(entry.fee).toString() }
+      : {}),
     timestamp: new Date(entry.timestamp * 1000).toISOString(),
     blockHeight: entry.block_height ?? entry.height ?? 0,
     address: entry.address,
@@ -576,6 +587,7 @@ export type PaymentProofVerification = {
   confirmations: number;
   inPool: boolean;
   receivedXmr: string;
+  receivedAtomic: string;
 };
 
 /**
@@ -610,6 +622,7 @@ export async function verifyPaymentProof(options: {
     confirmations: result.confirmations,
     inPool: result.in_pool,
     receivedXmr: atomicToXmr(result.received),
+    receivedAtomic: BigInt(result.received).toString(),
   };
 }
 

@@ -26,12 +26,12 @@ export async function GET(request: Request) {
       fiatCurrency: quote.currency,
       amountXmr: atomicToXmr(atomic),
       amountAtomic: atomic.toString(),
-      usdPerXmr: quote.usdPerXmr,
-      fiatPerUsd: quote.fiatPerUsd,
-      sources: quote.sources,
-      stale: quote.stale,
-      degraded: quote.degraded,
-      fetchedAt: quote.fetchedAt,
+      rateUsd: quote.usdPerXmr.toString(),
+      fxRate: quote.fiatPerUsd.toString(),
+      rateSources: quote.sources.join(","),
+      rateStale: quote.stale,
+      rateDegraded: quote.degraded,
+      rateFetchedAt: quote.fetchedAt,
     });
   } catch (error) {
     return apiError(error, "Failed to build quote");

@@ -5,7 +5,8 @@ import { getPaymentConfig } from "@/lib/config";
 import { inc, observe } from "@/lib/metrics";
 import { SINGLE_USER_ID } from "@/lib/auth";
 import { optionalLabel } from "@/lib/validation";
-import { atomicToXmr, xmrToAtomic } from "@/lib/monero/money";
+import { paymentEventData, paymentLinkView } from "@/lib/api/serialize";
+import { xmrToAtomic } from "@/lib/monero/money";
 import {
   createPaymentRequestAtomic,
   getTransfers,
@@ -184,19 +185,15 @@ export async function createPaymentLink(input: CreateLinkInput, options: CreateL
   try {
     const request = await createPaymentRequestAtomic(SINGLE_USER_ID, atomic, label);
 
-    const response = {
-      id: reservation.id,
-      uri: request.uri,
+    const created = {
+      ...reservation,
       address: request.address,
-      amountXmr: atomicToXmr(atomic),
-      amountAtomic: request.amountAtomic,
-      fiatAmount: reservation.fiatAmount,
-      fiatCurrency: reservation.fiatCurrency,
-      rateUsd: reservation.rateUsd,
-      rateSources: reservation.rateSources,
-      requiredConfirmations: reservation.requiredConfirmations,
+      uri: request.uri,
+      amount: request.amountAtomic,
       status: "pending",
-      expiresAt: reservation.expiresAt,
+    };
+    const response = {
+      ...paymentLinkView(created),
       statusUrl: `/api/payment-links/${reservation.id}/status`,
       statusToken: token,
     };
@@ -213,11 +210,7 @@ export async function createPaymentLink(input: CreateLinkInput, options: CreateL
     });
 
     inc("pay_payment_links_created_total");
-    await emit("payment.created", {
-      id: reservation.id,
-      amountXmr: response.amountXmr,
-      expiresAt: response.expiresAt,
-    });
+    await emit("payment.created", paymentEventData(created));
 
     return response;
   } catch (error) {
@@ -232,29 +225,7 @@ export async function getPaymentLinkStatus(id: string, token: string | null) {
   const record = await prisma.paymentRequest.findUnique({ where: { id } });
   if (!record?.publicTokenHash || !tokenMatches(token, record.publicTokenHash)) return null;
 
-  return {
-    id: record.id,
-    status: record.status,
-    amountXmr: atomicToXmr(record.amount),
-    amountAtomic: record.amount,
-    fiatAmount: record.fiatAmount,
-    fiatCurrency: record.fiatCurrency,
-    expiresAt: record.expiresAt,
-    paidAt: record.paidAt,
-    cancelledAt: record.cancelledAt,
-    lateDetectedAt: record.lateDetectedAt,
-    txHash: record.txHash,
-    confirmations: record.confirmations,
-    receivedAtomic: record.receivedAtomic,
-    receivedXmr: record.receivedAtomic ? atomicToXmr(record.receivedAtomic) : null,
-    requiredConfirmations:
-      record.requiredConfirmations ?? getPaymentConfig().requiredConfirmations,
-    confirmationsRemaining: Math.max(
-      0,
-      (record.requiredConfirmations ?? getPaymentConfig().requiredConfirmations) -
-        record.confirmations
-    ),
-  };
+  return paymentLinkView(record);
 }
 
 /** Cancel only a waiting request with no observed transaction. */
@@ -276,8 +247,14 @@ export async function cancelPaymentLink(id: string) {
     throw new ConflictError("Payment can only be cancelled while it is waiting for a transaction");
   }
 
-  await emit("payment.cancelled", { id });
-  return { id, status: "cancelled" };
+  const record = await prisma.paymentRequest.findUnique({ where: { id } });
+  const cancelled = {
+    ...(record ?? { id, amount: "0" }),
+    status: "cancelled",
+    cancelledAt: new Date(),
+  };
+  await emit("payment.cancelled", paymentEventData(cancelled));
+  return paymentLinkView(cancelled);
 }
 
 export async function renewPaymentLink(id: string) {
@@ -349,27 +326,22 @@ export async function renewPaymentLink(id: string) {
     },
   });
 
-  await emit("payment.renewed", { id: record.id, fromId: previous.id });
+  await emit("payment.renewed", paymentEventData(record, { fromId: previous.id }));
 
   return {
-    id: record.id,
-    uri: record.uri,
-    address: record.address,
-    amountXmr: atomicToXmr(atomic),
-    amountAtomic: record.amount,
-    status: record.status,
-    expiresAt: record.expiresAt,
+    ...paymentLinkView(record),
     statusUrl: `/api/payment-links/${record.id}/status`,
     statusToken: token,
   };
 }
 
 export async function listPaymentLinks(status?: string) {
-  return prisma.paymentRequest.findMany({
+  const records = await prisma.paymentRequest.findMany({
     where: status ? { status } : undefined,
     orderBy: { createdAt: "desc" },
     take: 100,
   });
+  return records.map(paymentLinkView);
 }
 
 export async function settlePaymentLinks() {
@@ -411,15 +383,19 @@ async function settlePaymentLinksInner() {
 
   for (const request of active) {
     const seen = new Set<string>();
-    const candidates = transfers
-      .filter(
-        (transfer) => transfer.txid === request.txHash || transfer.address === request.address
-      )
-      .filter((transfer) => {
-        if (seen.has(transfer.txid)) return false;
-        seen.add(transfer.txid);
-        return true;
-      });
+    // Prefer the invoice subaddress. A transaction can also return change to
+    // the primary address; matching by txHash alone would count that change
+    // toward the payment.
+    const addressMatches = transfers.filter((transfer) => transfer.address === request.address);
+    const matched =
+      addressMatches.length > 0
+        ? addressMatches
+        : transfers.filter((transfer) => transfer.txHash === request.txHash);
+    const candidates = matched.filter((transfer) => {
+      if (seen.has(transfer.txHash)) return false;
+      seen.add(transfer.txHash);
+      return true;
+    });
 
     if (candidates.length > 0) {
       for (const transfer of candidates) {
@@ -427,12 +403,12 @@ async function settlePaymentLinksInner() {
 
         await prisma.paymentRequestTransfer.upsert({
           where: {
-            paymentRequestId_txid: { paymentRequestId: request.id, txid: transfer.txid },
+            paymentRequestId_txid: { paymentRequestId: request.id, txid: transfer.txHash },
           },
           update: { blockHeight: transfer.blockHeight, amount: amountAtomic.toString() },
           create: {
             paymentRequestId: request.id,
-            txid: transfer.txid,
+            txid: transfer.txHash,
             amount: amountAtomic.toString(),
             blockHeight: transfer.blockHeight,
           },
@@ -455,11 +431,13 @@ async function settlePaymentLinksInner() {
       else if (confirmations >= required) status = "confirmed";
       else status = confirmations > 0 ? "confirming" : "detected";
 
+      const paidAt = request.paidAt ?? new Date();
+      const txHash = request.txHash ?? candidates[0].txHash;
       await prisma.paymentRequest.update({
         where: { id: request.id },
         data: {
-          txHash: request.txHash ?? candidates[0].txid,
-          paidAt: request.paidAt ?? new Date(),
+          txHash,
+          paidAt,
           confirmations,
           status,
           receivedAtomic: received.toString(),
@@ -471,12 +449,17 @@ async function settlePaymentLinksInner() {
 
       if (status !== request.status) {
         inc("pay_payment_status_transitions_total", { status });
-        await emit(`payment.${status}`, {
-          id: request.id,
-          txHash: candidates[0].txid,
-          confirmations,
-          receivedAtomic: received.toString(),
-        });
+        await emit(
+          `payment.${status}`,
+          paymentEventData({
+            ...request,
+            status,
+            txHash,
+            paidAt,
+            confirmations,
+            receivedAtomic: received.toString(),
+          })
+        );
       }
       continue;
     }
@@ -486,7 +469,7 @@ async function settlePaymentLinksInner() {
         where: { id: request.id },
         data: { status: "expired" },
       });
-      await emit("payment.expired", { id: request.id });
+      await emit("payment.expired", paymentEventData({ ...request, status: "expired" }));
     }
   }
 

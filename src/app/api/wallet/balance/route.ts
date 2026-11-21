@@ -8,8 +8,20 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const user = await requireUser();
-    const { balanceXmr, unlockedBalanceXmr, blocksToUnlock } = await getWalletInfo(user.id);
-    return NextResponse.json({ balanceXmr, unlockedBalanceXmr, blocksToUnlock });
+    const {
+      balanceXmr,
+      balanceAtomic,
+      unlockedBalanceXmr,
+      unlockedBalanceAtomic,
+      blocksToUnlock,
+    } = await getWalletInfo(user.id);
+    return NextResponse.json({
+      balanceXmr,
+      balanceAtomic,
+      unlockedBalanceXmr,
+      unlockedBalanceAtomic,
+      blocksToUnlock,
+    });
   } catch (error) {
     return apiError(error, "Failed to read balance");
   }

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getMoneroNetwork } from "@/lib/monero/network";
 import { atomicToXmr } from "@/lib/monero/money";
+import { paymentLinkView } from "@/lib/api/serialize";
 
 export async function getAuditReport(userId: string) {
   const [wallet, requests] = await Promise.all([
@@ -25,23 +26,11 @@ export async function getAuditReport(userId: string) {
       isWatchOnly: wallet?.isWatchOnly ?? false,
     },
     payments: requests.map((request) => ({
-      id: request.id,
-      label: request.label,
-      status: request.status,
-      address: request.address,
-      amountXmr: atomicToXmr(request.amount),
-      amountAtomic: request.amount,
-      receivedXmr: request.receivedAtomic ? atomicToXmr(request.receivedAtomic) : null,
-      fiatAmount: request.fiatAmount,
-      fiatCurrency: request.fiatCurrency,
-      txHash: request.txHash,
-      confirmations: request.confirmations,
-      createdAt: request.createdAt.toISOString(),
-      paidAt: request.paidAt?.toISOString() ?? null,
-      cancelledAt: request.cancelledAt?.toISOString() ?? null,
+      ...paymentLinkView(request),
       transfers: request.transfers.map((transfer) => ({
-        txid: transfer.txid,
+        txHash: transfer.txid,
         amountXmr: atomicToXmr(transfer.amount),
+        amountAtomic: BigInt(transfer.amount).toString(),
         blockHeight: transfer.blockHeight,
         createdAt: transfer.createdAt.toISOString(),
       })),
@@ -63,7 +52,9 @@ export function auditToCsv(report: Awaited<ReturnType<typeof getAuditReport>>): 
     "status",
     "address",
     "amountXmr",
+    "amountAtomic",
     "receivedXmr",
+    "receivedAtomic",
     "fiatAmount",
     "fiatCurrency",
     "txHash",
@@ -80,7 +71,9 @@ export function auditToCsv(report: Awaited<ReturnType<typeof getAuditReport>>): 
       payment.status,
       payment.address,
       payment.amountXmr,
+      payment.amountAtomic,
       payment.receivedXmr,
+      payment.receivedAtomic,
       payment.fiatAmount,
       payment.fiatCurrency,
       payment.txHash,

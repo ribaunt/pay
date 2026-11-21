@@ -6,6 +6,7 @@ import { apiError } from "@/lib/api-response";
 import { clientId, rateLimit } from "@/lib/rate-limit";
 import { optionalLabel, requireXmrAmount } from "@/lib/validation";
 import { resolvePaymentTimeout } from "@/lib/payments/timeout";
+import { paymentLinkView } from "@/lib/api/serialize";
 
 export const dynamic = "force-dynamic";
 
@@ -62,10 +63,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         payment: {
-          ...record,
-          amountXmr: payment.amountXmr,
+          ...paymentLinkView(record),
           addressIndex: payment.addressIndex,
-          expiresAt: record.expiresAt,
         },
       },
       { status: 201 }
@@ -83,7 +82,7 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-    return NextResponse.json({ requests });
+    return NextResponse.json({ requests: requests.map(paymentLinkView) });
   } catch (error) {
     return apiError(error, "Failed to list payment requests");
   }
