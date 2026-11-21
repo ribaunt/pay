@@ -4,6 +4,7 @@ import { getMoneroNetwork } from "@/lib/monero/network";
 import { getWalletHeight } from "@/lib/monero/wallet";
 import { getDaemonHeight } from "@/lib/monero/daemon";
 import { getPaymentConfig } from "@/lib/config";
+import { evaluateHealth } from "@/lib/health";
 import { setGauge } from "@/lib/metrics";
 import { collectBusinessMetrics } from "@/lib/business-metrics";
 import { NextResponse } from "next/server";
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
 // a few seconds to answer even get_version. Keep this generous so a live but
 // busy RPC is not reported as down.
 const HEALTH_TIMEOUT_MS = 20_000;
+
+let lastRpcUpAt = 0;
 
 /** Never let a busy wallet RPC hold the health endpoint open. */
 async function within<T>(promise: Promise<T>, fallback: T, ms = HEALTH_TIMEOUT_MS): Promise<T> {
@@ -31,37 +34,31 @@ async function within<T>(promise: Promise<T>, fallback: T, ms = HEALTH_TIMEOUT_M
 }
 
 export async function GET() {
-  const [db, walletRpc] = await Promise.all([
+  const [db, rpcNow] = await Promise.all([
     within(prisma.$queryRaw`SELECT 1`.then(() => true).catch(() => false), false),
     within(walletRpcPing(), false),
   ]);
+  if (rpcNow) lastRpcUpAt = Date.now();
 
-  let daemon = false;
-  let walletHeight = 0;
-  let daemonHeight = 0;
+  // Query the daemon independently. Previously a slow RPC also made the daemon
+  // look down, which turned a busy-but-alive node into a degraded health check.
+  const [daemonHeight, walletHeight] = await Promise.all([
+    within(getDaemonHeight(), 0),
+    rpcNow ? within(getWalletHeight(), 0) : Promise.resolve(0),
+  ]);
+  const daemon = daemonHeight > 0;
 
-  if (walletRpc) {
-    const results = await Promise.allSettled([
-      within(getDaemonHeight(), 0),
-      within(getWalletHeight(), 0),
-    ]);
-    if (results[0].status === "fulfilled" && results[0].value > 0) {
-      daemon = true;
-      daemonHeight = results[0].value;
-    }
-    if (results[1].status === "fulfilled" && results[1].value > 0) {
-      walletHeight = results[1].value;
-    }
-  }
-
-  const syncLag = Math.max(0, daemonHeight - walletHeight);
-  const maxLag = getPaymentConfig().maxSyncLagBlocks;
-  const syncStatus =
-    !daemon || walletHeight === 0
-      ? "unavailable"
-      : syncLag > maxLag
-        ? "syncing"
-        : "synced";
+  const config = getPaymentConfig();
+  const evaluation = evaluateHealth({
+    db,
+    rpcNow,
+    lastRpcUpAt,
+    daemon,
+    walletHeight,
+    daemonHeight,
+    maxSyncLagBlocks: config.maxSyncLagBlocks,
+  });
+  const { walletRpc, healthy, syncStatus, syncLag } = evaluation;
 
   setGauge("pay_db_up", db ? 1 : 0);
   // Keep the last good value on transient timeouts: a busy RPC is not a dead
@@ -72,8 +69,6 @@ export async function GET() {
   if (daemonHeight > 0) setGauge("pay_daemon_height", daemonHeight);
   setGauge("pay_wallet_sync_lag_blocks", syncLag);
   await within(collectBusinessMetrics(), undefined, 1_500);
-
-  const healthy = db && walletRpc && daemon;
 
   return NextResponse.json(
     {

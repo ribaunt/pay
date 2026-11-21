@@ -142,11 +142,16 @@ CRON_INTERVAL="${CRON_INTERVAL_SECONDS:-30}"
       -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
     curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/webhooks \
       -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
+    curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/wallet-store \
+      -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
   done
 ) &
 CRON_PID=$!
 
 cleanup() {
+  # Flush the scan position before stopping the RPC, otherwise a restart replays blocks.
+  curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/wallet-store \
+    -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
   kill "$APP_PID" 2>/dev/null || true
   kill "$CRON_PID" 2>/dev/null || true
   kill "$RPC_PID" 2>/dev/null || true

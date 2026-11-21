@@ -630,3 +630,20 @@ export async function closeWallet(): Promise<void> {
   await walletRpc("close_wallet");
   openWalletFile = null;
 }
+
+/**
+ * Flush the wallet's scan position to disk. monero-wallet-rpc only persists
+ * progress on store/close, so calling this periodically prevents a container
+ * restart from replaying thousands of already-scanned blocks.
+ */
+export async function storeWallet(): Promise<boolean> {
+  if (!openWalletFile) return false;
+  try {
+    await walletRpc("store");
+    return true;
+  } catch {
+    // A busy RPC or a wallet that was just closed is not an error worth failing
+    // a settlement sweep over. The next sweep will try again.
+    return false;
+  }
+}
