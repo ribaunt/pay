@@ -29,4 +29,4 @@ data: { ...PaymentLink... }
 
 `payment.update` is sent when `status`, `confirmations`, or `receivedAtomic` changes. `payment.removed` is sent when a link disappears from the result set. Streams close after five minutes so clients should reconnect.
 
-The `data` object is the canonical [`PaymentLink`](types.md#paymentlink) shape.
+The `data` object is the canonical [`PaymentLink`](../reference/types.md#paymentlink) shape.
