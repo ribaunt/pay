@@ -1,0 +1,160 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Ribaunt Pay API",
+    "version": "0.8.4",
+    "description": "API-first, watch-only Monero payment server. All amounts use XMR/atomic pairs and every timestamp is an ISO string or null."
+  },
+  "servers": [{ "url": "http://localhost:3000" }],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": { "type": "apiKey", "in": "header", "name": "x-api-key" },
+      "CronSecret": { "type": "apiKey", "in": "header", "name": "x-cron-secret" },
+      "StatusToken": { "type": "apiKey", "in": "header", "name": "x-status-token" }
+    },
+    "schemas": {
+      "PaymentLink": {
+        "type": "object",
+        "required": ["id", "status", "amountXmr", "amountAtomic", "txHash", "confirmations"],
+        "properties": {
+          "id": { "type": "string" },
+          "storeId": { "type": "string", "nullable": true },
+          "status": { "type": "string" },
+          "address": { "type": "string", "nullable": true },
+          "uri": { "type": "string", "nullable": true },
+          "label": { "type": "string", "nullable": true },
+          "amountXmr": { "type": "string" },
+          "amountAtomic": { "type": "string" },
+          "receivedXmr": { "type": "string", "nullable": true },
+          "receivedAtomic": { "type": "string", "nullable": true },
+          "coveredXmr": { "type": "string" },
+          "coveredAtomic": { "type": "string" },
+          "unlockedXmr": { "type": "string" },
+          "unlockedAtomic": { "type": "string" },
+          "complete": { "type": "boolean" },
+          "zeroConf": { "type": "boolean" },
+          "fiatAmount": { "type": "string", "nullable": true },
+          "fiatCurrency": { "type": "string", "nullable": true },
+          "rateUsd": { "type": "string", "nullable": true },
+          "fxRate": { "type": "string", "nullable": true },
+          "rateSources": { "type": "string", "nullable": true },
+          "rateFetchedAt": { "type": "string", "nullable": true },
+          "rateStale": { "type": "boolean" },
+          "rateDegraded": { "type": "boolean" },
+          "requiredConfirmations": { "type": "integer" },
+          "confirmations": { "type": "integer" },
+          "confirmationsRemaining": { "type": "integer" },
+          "txHash": { "type": "string", "nullable": true },
+          "createdAt": { "type": "string", "nullable": true },
+          "expiresAt": { "type": "string", "nullable": true },
+          "paidAt": { "type": "string", "nullable": true },
+          "cancelledAt": { "type": "string", "nullable": true },
+          "lateDetectedAt": { "type": "string", "nullable": true }
+        }
+      },
+      "CreateLinkInput": {
+        "type": "object",
+        "properties": {
+          "amountXmr": { "type": "string" },
+          "fiatAmount": { "type": "string" },
+          "fiatCurrency": { "type": "string" },
+          "timeoutSeconds": { "type": "integer" },
+          "requiredConfirmations": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "zeroConf": { "type": "boolean" },
+          "label": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "WebhookPayload": {
+        "type": "object",
+        "properties": {
+          "event": { "type": "string" },
+          "createdAt": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/PaymentLink" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/health": {
+      "get": { "summary": "Service health", "responses": { "200": { "description": "Health" } } }
+    },
+    "/api/sync": {
+      "get": { "summary": "Wallet sync progress with percentage and ETA", "responses": { "200": { "description": "Sync progress" } } }
+    },
+    "/api/payment-links": {
+      "get": {
+        "summary": "List payment links",
+        "security": [{ "ApiKey": [] }],
+        "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Links" } }
+      },
+      "post": {
+        "summary": "Create a payment link",
+        "security": [{ "ApiKey": [] }],
+        "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateLinkInput" } } } },
+        "responses": { "201": { "description": "Created link" } }
+      }
+    },
+    "/api/payment-links/{id}/status": {
+      "get": {
+        "summary": "Read link status",
+        "security": [{ "StatusToken": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Status" } }
+      }
+    },
+    "/api/payment-links/{id}/cancel": {
+      "post": {
+        "summary": "Cancel a waiting link",
+        "security": [{ "ApiKey": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Cancelled link" } }
+      }
+    },
+    "/api/payment-links/{id}/renew": {
+      "post": {
+        "summary": "Renew an expired link",
+        "security": [{ "ApiKey": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "201": { "description": "Renewed link" } }
+      }
+    },
+    "/api/prices/quote": {
+      "get": {
+        "summary": "Fiat to XMR quote",
+        "parameters": [
+          { "name": "fiatAmount", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "fiatCurrency", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Quote" } }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "summary": "Server-sent payment events",
+        "security": [{ "ApiKey": [] }],
+        "parameters": [
+          { "name": "linkId", "in": "query", "schema": { "type": "string" } },
+          { "name": "token", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Event stream", "content": { "text/event-stream": {} } } }
+      }
+    },
+    "/api/admin/stores": {
+      "get": { "summary": "List unlinkable stores", "responses": { "200": { "description": "Stores" } } },
+      "post": { "summary": "Create a store with its own Monero account", "responses": { "201": { "description": "Store" } } }
+    },
+    "/api/admin/attestations": {
+      "get": {
+        "summary": "Signed aggregate revenue attestation",
+        "parameters": [
+          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date-time" } },
+          { "name": "storeId", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Attestation" } }
+      }
+    }
+  }
+}
