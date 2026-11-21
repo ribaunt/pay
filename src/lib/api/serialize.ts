@@ -32,7 +32,7 @@ export type PaymentRecordLike = {
   confirmations?: number;
   zeroConf?: boolean;
   txHash?: string | null;
-  createdAt?: Date | string;
+  createdAt?: Date | string | null;
   expiresAt?: Date | string | null;
   paidAt?: Date | string | null;
   cancelledAt?: Date | string | null;
