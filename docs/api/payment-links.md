@@ -43,7 +43,13 @@ Create and manage payment requests with the server-to-server API. See the [guide
 | `amountXmr` | string | one of the two | Decimal XMR, up to 12 fractional digits. |
 | `timeoutSeconds` | number | no | Clamped to configured bounds; `0` means no expiry. |
 | `requiredConfirmations` | number | no | Integer 1–100. |
+| `zeroConf` | boolean | no | Treat a fully covered mempool transfer as confirmed. Requires `PAYMENT_ALLOW_ZERO_CONF=1`. |
 | `label`, `description` | string | no | Up to 200 characters. |
+
+Responses also include `storeId`, `zeroConf`, `coveredXmr`/`coveredAtomic`,
+`unlockedXmr`/`unlockedAtomic`, and `complete`. `complete` means the received
+amount meets the requested amount. `unlocked` becomes non-zero once the link's
+confirmation policy is satisfied (immediately for zero-conf links).
 
 Optional header: `Idempotency-Key`. It's scoped to the API key and lasts 24 hours.
 

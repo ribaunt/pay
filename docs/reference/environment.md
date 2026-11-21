@@ -60,6 +60,7 @@ Generate random values with `openssl rand -hex 32` or your password manager. Don
 | `PAYMENT_MIN_TIMEOUT_SECONDS` | `60` | Lower bound for a requested timeout. |
 | `PAYMENT_MAX_TIMEOUT_SECONDS` | `86400` | Upper bound for a requested timeout. |
 | `PAYMENT_REQUIRED_CONFIRMATIONS` | `10` | Default confirmations for a link. |
+| `PAYMENT_ALLOW_ZERO_CONF` | `0` | Set to `1` to allow `zeroConf` links, which confirm a fully covered mempool transfer. High double-spend risk. |
 | `HEALTH_MAX_SYNC_LAG_BLOCKS` | `10` | Lag above which health reports `syncing`. |
 | `PRICE_CACHE_TTL_SECONDS` | `60` | Quote cache lifetime. |
 | `PRICE_MAX_STALENESS_SECONDS` | `300` | Maximum age of a cached quote served during an outage. |

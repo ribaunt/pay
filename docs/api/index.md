@@ -65,6 +65,8 @@ Webhook `data` is built from the same fields plus the event `status`.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | [`/api/health`](health.md) | Service health and sync status. |
+| `GET` | `/api/sync` | Detailed sync progress: restore height, percent, ETA. |
+| `GET` | `/openapi.json` | Machine-readable OpenAPI contract. |
 | `POST` | [`/api/auth/login`](authentication.md) | Sign in with `.env` credentials. |
 | `POST` | [`/api/auth/logout`](authentication.md) | Invalidate all sessions. |
 | `GET` | [`/api/auth/me`](authentication.md) | Current session user. |
@@ -84,6 +86,7 @@ Webhook `data` is built from the same fields plus the event `status`.
 | `POST` | [`/api/cron/payment-links`](payment-links.md) | Run a settlement pass. |
 | `POST` | [`/api/cron/webhooks`](webhooks.md) | Deliver queued events. |
 | `GET` | [`/api/metrics`](admin-and-metrics.md) | Prometheus metrics. |
+| `GET` | [`/api/events`](events.md) | SSE stream of payment-link updates. |
 | `GET` | [`/api/wallet/audit`](wallet.md) | View-key-only accounting export. |
 
 ### Session-authenticated
@@ -101,6 +104,8 @@ Webhook `data` is built from the same fields plus the event `status`.
 | `POST` | [`/api/wallet/close`](wallet.md) | Close the loaded wallet. |
 | `GET`, `POST` | [`/api/admin/api-keys`](admin-and-metrics.md) | List or create API keys. |
 | `POST` | [`/api/admin/api-keys/{id}/revoke`](admin-and-metrics.md) | Revoke a key. |
+| `GET`, `POST` | [`/api/admin/stores`](stores.md) | Create/list unlinkable stores. |
+| `GET` | [`/api/admin/attestations`](attestations.md) | Signed aggregate revenue report. |
 
 ## Rate limits
 

@@ -50,6 +50,9 @@ nav = [
     { "Prices" = "api/prices.md" },
     { "Webhooks" = "api/webhooks.md" },
     { "Admin and metrics" = "api/admin-and-metrics.md" },
+    { "Stores" = "api/stores.md" },
+    { "Events (SSE)" = "api/events.md" },
+    { "Attestations" = "api/attestations.md" },
     { "Payment proofs" = "api/proofs.md" },
   ] },
   { "Reference" = [
