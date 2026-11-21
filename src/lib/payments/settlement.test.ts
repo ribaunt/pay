@@ -20,6 +20,7 @@ await vi.mock("@/lib/prisma", () => ({
     },
     wallet: {
       findUnique: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
@@ -28,11 +29,12 @@ await vi.mock("@/lib/monero/wallet", () => ({
   createPaymentRequestAtomic: vi.fn(),
   markSubaddressUsed: vi.fn(),
   getTransfers: vi.fn(),
+  getTransfersSince: vi.fn(),
   getWalletHeight: vi.fn(),
 }));
 
 const { prisma } = await import("@/lib/prisma");
-const { createPaymentRequestAtomic, getTransfers, getWalletHeight } = await import("@/lib/monero/wallet");
+const { createPaymentRequestAtomic, getTransfersSince, getWalletHeight } = await import("@/lib/monero/wallet");
 const { emitWebhook } = await import("./webhooks");
 const { cancelPaymentLink, renewPaymentLink, settlePaymentLinks } = await import("./links");
 const { ConflictError } = await import("@/lib/api-response");
@@ -59,7 +61,8 @@ beforeEach(() => {
   vi.mocked(prisma.paymentRequest.update).mockResolvedValue({} as never);
   vi.mocked(prisma.paymentRequest.updateMany).mockResolvedValue({ count: 1 });
   vi.mocked(prisma.paymentRequestTransfer.upsert).mockResolvedValue({} as never);
-  vi.mocked(prisma.wallet.findUnique).mockResolvedValue({ id: "wallet-1" } as never);
+  vi.mocked(prisma.wallet.findUnique).mockResolvedValue({ id: "wallet-1", settlementCursorHeight: 0 } as never);
+  vi.mocked(prisma.wallet.update).mockResolvedValue({} as never);
   vi.mocked(createPaymentRequestAtomic).mockResolvedValue({
     address: "8new",
     addressIndex: 2,
@@ -70,11 +73,66 @@ beforeEach(() => {
 });
 
 describe("settlePaymentLinks", () => {
+  it("scans incrementally from the stored cursor", async () => {
+    vi.mocked(prisma.wallet.findUnique).mockResolvedValue({
+      id: "wallet-1",
+      settlementCursorHeight: 1000,
+    } as never);
+    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+      request({ id: "cursor-1", address: "addr-cursor" }),
+    ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([]);
+    vi.mocked(getWalletHeight).mockResolvedValue(1000);
+
+    await settlePaymentLinks();
+
+    expect(getTransfersSince).toHaveBeenCalledWith("single-user", 1000);
+    expect(prisma.wallet.update).not.toHaveBeenCalled();
+  });
+
+  it("skips database writes when nothing changed", async () => {
+    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+      request({
+        id: "noop-1",
+        address: "addr-noop",
+        status: "confirming",
+        txHash: "tx-noop",
+        paidAt: new Date("2026-01-01T00:00:00Z"),
+        confirmations: 6,
+        receivedAtomic: "100000000000",
+        transfers: [
+          {
+            txid: "tx-noop",
+            amount: "100000000000",
+            blockHeight: 995,
+            createdAt: new Date("2026-01-01T00:00:00Z"),
+          },
+        ],
+      }),
+    ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([
+      {
+        txHash: "tx-noop",
+        address: "addr-noop",
+        blockHeight: 995,
+        amountXmr: "0.1",
+        type: "in",
+        timestamp: now.toISOString(),
+      },
+    ] as never);
+
+    await settlePaymentLinks();
+
+    expect(prisma.paymentRequestTransfer.upsert).not.toHaveBeenCalled();
+    expect(prisma.paymentRequest.update).not.toHaveBeenCalled();
+    expect(emitWebhook).not.toHaveBeenCalled();
+  });
+
   it("emits a canonical webhook payload on status transitions", async () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "hook-1", address: "addr-hook", status: "detected" }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-hook", address: "addr-hook", blockHeight: 995, amountXmr: "0.1", amountAtomic: "100000000000", type: "in", timestamp: now.toISOString() },
     ] as never);
 
@@ -100,7 +158,7 @@ describe("settlePaymentLinks", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "expired-1", status: "pending", expiresAt: new Date(now.getTime() - 1000) }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([]);
+    vi.mocked(getTransfersSince).mockResolvedValue([]);
 
     const result = await settlePaymentLinks();
 
@@ -125,7 +183,7 @@ describe("settlePaymentLinks", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "detect-1", address: "addr-2" }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-2", address: "addr-2", blockHeight: 0, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
@@ -143,7 +201,7 @@ describe("settlePaymentLinks", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "confirm-1", address: "addr-3", status: "detected" }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-3", address: "addr-3", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
@@ -160,7 +218,7 @@ describe("settlePaymentLinks", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "confirmed-1", address: "addr-4", status: "confirming" }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-4", address: "addr-4", blockHeight: 990, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
@@ -177,7 +235,7 @@ describe("settlePaymentLinks", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "dup-1", address: "addr-dup", status: "detected" }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-a", address: "addr-dup", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
       { txHash: "tx-b", address: "addr-dup", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
@@ -199,7 +257,7 @@ describe("settlePaymentLinks", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "late-1", address: "addr-5", status: "expired", expiresAt: new Date(now.getTime() - 1000) }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-5", address: "addr-5", blockHeight: 999, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
@@ -216,7 +274,7 @@ describe("settlePaymentLinks", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "late-2", address: "addr-late", status: "late", txHash: "tx-late" }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-late", address: "addr-late", blockHeight: 990, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
@@ -269,7 +327,7 @@ describe("partial payments", () => {
         receivedAtomic: "40000000000",
       }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-1", address: "addr-topup", blockHeight: 995, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
       { txHash: "tx-2", address: "addr-topup", blockHeight: 995, amountXmr: "0.06", type: "in", timestamp: now.toISOString() },
     ] as never);
@@ -291,7 +349,7 @@ describe("partial payments", () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "partial-1", address: "addr-partial", status: "pending" }),
     ] as never);
-    vi.mocked(getTransfers).mockResolvedValue([
+    vi.mocked(getTransfersSince).mockResolvedValue([
       { txHash: "tx-partial", address: "addr-partial", blockHeight: 995, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
     ] as never);
 

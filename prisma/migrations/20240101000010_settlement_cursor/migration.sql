@@ -1,0 +1,1 @@
+ALTER TABLE "Wallet" ADD COLUMN "settlementCursorHeight" INTEGER NOT NULL DEFAULT 0;

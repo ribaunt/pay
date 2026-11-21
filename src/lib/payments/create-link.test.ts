@@ -26,6 +26,7 @@ await vi.mock("@/lib/monero/wallet", () => ({
   createFreshSubaddress: vi.fn(),
   markSubaddressUsed: vi.fn(),
   getTransfers: vi.fn(),
+  getTransfersSince: vi.fn(),
   getWalletHeight: vi.fn(),
 }));
 

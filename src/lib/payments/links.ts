@@ -9,7 +9,7 @@ import { paymentEventData, paymentLinkView } from "@/lib/api/serialize";
 import { xmrToAtomic } from "@/lib/monero/money";
 import {
   createPaymentRequestAtomic,
-  getTransfers,
+  getTransfersSince,
   getWalletHeight,
   markSubaddressUsed,
 } from "@/lib/monero/wallet";
@@ -375,10 +375,32 @@ async function settlePaymentLinksInner() {
       },
     },
     take: 200,
+    include: { transfers: true },
   });
   if (active.length === 0) return { processed: 0 };
 
-  const transfers = await getTransfers(SINGLE_USER_ID, { incoming: true, pool: true });
+  const wallet = await prisma.wallet.findUnique({
+    where: { userId: SINGLE_USER_ID },
+    select: { id: true, settlementCursorHeight: true },
+  });
+
+  // Never advance past a transfer that an active link still depends on. A link
+  // with a txHash but no stored transfer is from an older record — use a full
+  // scan so its history cannot be skipped.
+  const needsFullScan = active.some(
+    (request) => request.txHash && (request.transfers ?? []).length === 0
+  );
+  const activeBlocks = active.flatMap((request) =>
+    (request.transfers ?? [])
+      .map((transfer) => transfer.blockHeight)
+      .filter((block) => block > 0)
+  );
+  const oldestActiveBlock = activeBlocks.length > 0 ? Math.min(...activeBlocks) : Number.MAX_SAFE_INTEGER;
+  const cursor = needsFullScan
+    ? 0
+    : Math.min(wallet?.settlementCursorHeight ?? 0, oldestActiveBlock);
+
+  const transfers = await getTransfersSince(SINGLE_USER_ID, cursor);
   const height = await getWalletHeight().catch(() => 0);
 
   for (const request of active) {
@@ -399,17 +421,27 @@ async function settlePaymentLinksInner() {
 
     if (candidates.length > 0) {
       for (const transfer of candidates) {
-        const amountAtomic = xmrToAtomic(transfer.amountXmr);
+        const amountAtomic = xmrToAtomic(transfer.amountXmr).toString();
+        const existing = (request.transfers ?? []).find((row) => row.txid === transfer.txHash);
+
+        // At 30s intervals a no-op upsert on every sweep is pure database churn.
+        if (
+          existing &&
+          existing.amount === amountAtomic &&
+          existing.blockHeight === transfer.blockHeight
+        ) {
+          continue;
+        }
 
         await prisma.paymentRequestTransfer.upsert({
           where: {
             paymentRequestId_txid: { paymentRequestId: request.id, txid: transfer.txHash },
           },
-          update: { blockHeight: transfer.blockHeight, amount: amountAtomic.toString() },
+          update: { blockHeight: transfer.blockHeight, amount: amountAtomic },
           create: {
             paymentRequestId: request.id,
             txid: transfer.txHash,
-            amount: amountAtomic.toString(),
+            amount: amountAtomic,
             blockHeight: transfer.blockHeight,
           },
         });
@@ -433,19 +465,32 @@ async function settlePaymentLinksInner() {
 
       const paidAt = request.paidAt ?? new Date();
       const txHash = request.txHash ?? candidates[0].txHash;
-      await prisma.paymentRequest.update({
-        where: { id: request.id },
-        data: {
-          txHash,
-          paidAt,
-          confirmations,
-          status,
-          receivedAtomic: received.toString(),
-          ...(isLate && !request.lateDetectedAt ? { lateDetectedAt: new Date() } : {}),
-        },
+      const lateDetectedAt =
+        isLate && !request.lateDetectedAt ? new Date() : request.lateDetectedAt;
+      const data = {
+        txHash,
+        paidAt,
+        confirmations,
+        status,
+        receivedAtomic: received.toString(),
+        lateDetectedAt,
+      };
+      const changed = (Object.keys(data) as Array<keyof typeof data>).some((key) => {
+        const current = request[key];
+        const next = data[key];
+        if (next instanceof Date) {
+          return !current || new Date(current as string | Date).getTime() !== next.getTime();
+        }
+        return current !== next;
       });
+      if (changed) {
+        await prisma.paymentRequest.update({
+          where: { id: request.id },
+          data,
+        });
+      }
 
-      await markSubaddressUsed(request.walletId, request.address);
+      if (!request.txHash) await markSubaddressUsed(request.walletId, request.address);
 
       if (status !== request.status) {
         inc("pay_payment_status_transitions_total", { status });
@@ -471,6 +516,18 @@ async function settlePaymentLinksInner() {
       });
       await emit("payment.expired", paymentEventData({ ...request, status: "expired" }));
     }
+  }
+
+  // Keep the cursor behind the tip to tolerate short reorgs, and never move it
+  // backwards when the wallet is still syncing.
+  const nextCursor = Math.max(cursor, height > 0 ? height - 10 : 0);
+  if (wallet && nextCursor > wallet.settlementCursorHeight) {
+    await prisma.wallet
+      .update({
+        where: { id: wallet.id },
+        data: { settlementCursorHeight: nextCursor },
+      })
+      .catch(() => {});
   }
 
   return { processed: active.length };

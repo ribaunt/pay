@@ -522,6 +522,50 @@ export async function getTransfers(
     .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
 }
 
+/**
+ * Incremental variant used by settlement. Confirmed transfers are read from
+ * `minHeight` onward; pool/pending transfers are always read in full because
+ * they have no block height yet.
+ */
+export async function getTransfersSince(
+  userId: string,
+  minHeight: number
+): Promise<NormalizedTransfer[]> {
+  if (minHeight <= 0) return getTransfers(userId, { incoming: true, pool: true });
+
+  await ensureWalletOpen(userId);
+
+  const [confirmed, pending] = await Promise.all([
+    walletRpc<GetTransfersResult>("get_transfers", {
+      in: true,
+      out: false,
+      pending: false,
+      failed: false,
+      pool: false,
+      filter_by_height: true,
+      min_height: minHeight,
+    }),
+    walletRpc<GetTransfersResult>("get_transfers", {
+      in: false,
+      out: false,
+      pending: true,
+      failed: false,
+      pool: true,
+      filter_by_height: false,
+    }),
+  ]);
+
+  const seen = new Set<string>();
+  return [...(confirmed.in ?? []), ...(pending.pending ?? []), ...(pending.pool ?? [])]
+    .map(normalizeTransfer)
+    .filter((transfer) => {
+      if (seen.has(transfer.txHash)) return false;
+      seen.add(transfer.txHash);
+      return true;
+    })
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+}
+
 export type PaymentProof = {
   txHash: string;
   address: string;

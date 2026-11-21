@@ -70,6 +70,9 @@ model Wallet {
   address       String
   viewKey       String?
   restoreHeight Int?
+  // Last block height included by settlement. Kept behind the tip so a short
+  // chain reorg cannot make us miss a transfer.
+  settlementCursorHeight Int     @default(0)
   isWatchOnly   Boolean          @default(false)
   description   String?
   userId        String           @unique
