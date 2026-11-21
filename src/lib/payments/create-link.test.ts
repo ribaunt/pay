@@ -36,6 +36,7 @@ await vi.mock("@/lib/pricing/oracle", () => ({
 const { prisma } = await import("@/lib/prisma");
 const { createPaymentRequestAtomic } = await import("@/lib/monero/wallet");
 const { getPriceQuote } = await import("@/lib/pricing/oracle");
+const { emitWebhook } = await import("./webhooks");
 const { createPaymentLink } = await import("./links");
 
 const LINK_RESPONSE = {
@@ -86,6 +87,34 @@ beforeEach(() => {
 });
 
 describe("createPaymentLink", () => {
+  it("returns the canonical link shape and emits a canonical webhook payload", async () => {
+    const result = await createPaymentLink({ amountXmr: "0.1", timeoutSeconds: 0 });
+
+    expect(result).toMatchObject({
+      id: "link-1",
+      amountXmr: "0.1",
+      amountAtomic: "100000000000",
+      receivedXmr: null,
+      receivedAtomic: null,
+      txHash: null,
+      statusUrl: "/api/payment-links/link-1/status",
+    });
+    expect(typeof result.statusToken).toBe("string");
+    expect(result).not.toHaveProperty("amount");
+
+    const [event, data] = vi.mocked(emitWebhook).mock.calls[0];
+    expect(event).toBe("payment.created");
+    expect(data).toMatchObject({
+      id: "link-1",
+      status: "pending",
+      amountXmr: "0.1",
+      amountAtomic: "100000000000",
+      receivedXmr: null,
+      receivedAtomic: null,
+      txHash: null,
+    });
+  });
+
   it("stores a per-link confirmation threshold", async () => {
     const result = await createPaymentLink({
       amountXmr: "0.1",

@@ -33,6 +33,7 @@ await vi.mock("@/lib/monero/wallet", () => ({
 
 const { prisma } = await import("@/lib/prisma");
 const { createPaymentRequestAtomic, getTransfers, getWalletHeight } = await import("@/lib/monero/wallet");
+const { emitWebhook } = await import("./webhooks");
 const { cancelPaymentLink, renewPaymentLink, settlePaymentLinks } = await import("./links");
 const { ConflictError } = await import("@/lib/api-response");
 
@@ -69,6 +70,32 @@ beforeEach(() => {
 });
 
 describe("settlePaymentLinks", () => {
+  it("emits a canonical webhook payload on status transitions", async () => {
+    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+      request({ id: "hook-1", address: "addr-hook", status: "detected" }),
+    ] as never);
+    vi.mocked(getTransfers).mockResolvedValue([
+      { txHash: "tx-hook", address: "addr-hook", blockHeight: 995, amountXmr: "0.1", amountAtomic: "100000000000", type: "in", timestamp: now.toISOString() },
+    ] as never);
+
+    await settlePaymentLinks();
+
+    expect(emitWebhook).toHaveBeenCalled();
+    const [event, data] = vi.mocked(emitWebhook).mock.calls[0];
+    expect(event).toBe("payment.confirming");
+    expect(data).toMatchObject({
+      id: "hook-1",
+      status: "confirming",
+      amountXmr: "0.1",
+      amountAtomic: "100000000000",
+      receivedXmr: "0.1",
+      receivedAtomic: "100000000000",
+      txHash: "tx-hook",
+      confirmations: 6,
+    });
+    expect(data).not.toHaveProperty("txid");
+  });
+
   it("expires an unpaid pending link", async () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "expired-1", status: "pending", expiresAt: new Date(now.getTime() - 1000) }),
@@ -82,6 +109,16 @@ describe("settlePaymentLinks", () => {
       where: { id: "expired-1" },
       data: { status: "expired" },
     });
+    const [event, data] = vi.mocked(emitWebhook).mock.calls[0];
+    expect(event).toBe("payment.expired");
+    expect(data).toMatchObject({
+      id: "expired-1",
+      status: "expired",
+      amountXmr: "0.1",
+      amountAtomic: "100000000000",
+      receivedXmr: null,
+      receivedAtomic: null,
+    });
   });
 
   it("detects a pooled payment", async () => {
@@ -89,7 +126,7 @@ describe("settlePaymentLinks", () => {
       request({ id: "detect-1", address: "addr-2" }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-2", address: "addr-2", blockHeight: 0, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-2", address: "addr-2", blockHeight: 0, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -107,7 +144,7 @@ describe("settlePaymentLinks", () => {
       request({ id: "confirm-1", address: "addr-3", status: "detected" }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-3", address: "addr-3", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-3", address: "addr-3", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -124,7 +161,7 @@ describe("settlePaymentLinks", () => {
       request({ id: "confirmed-1", address: "addr-4", status: "confirming" }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-4", address: "addr-4", blockHeight: 990, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-4", address: "addr-4", blockHeight: 990, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -141,8 +178,8 @@ describe("settlePaymentLinks", () => {
       request({ id: "dup-1", address: "addr-dup", status: "detected" }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-a", address: "addr-dup", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
-      { txid: "tx-b", address: "addr-dup", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-a", address: "addr-dup", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-b", address: "addr-dup", blockHeight: 995, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -163,7 +200,7 @@ describe("settlePaymentLinks", () => {
       request({ id: "late-1", address: "addr-5", status: "expired", expiresAt: new Date(now.getTime() - 1000) }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-5", address: "addr-5", blockHeight: 999, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-5", address: "addr-5", blockHeight: 999, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -180,7 +217,7 @@ describe("settlePaymentLinks", () => {
       request({ id: "late-2", address: "addr-late", status: "late", txHash: "tx-late" }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-late", address: "addr-late", blockHeight: 990, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-late", address: "addr-late", blockHeight: 990, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -197,7 +234,18 @@ describe("cancelPaymentLink", () => {
   it("cancels a waiting request with no observed transaction", async () => {
     const result = await cancelPaymentLink("cancel-1");
 
-    expect(result).toEqual({ id: "cancel-1", status: "cancelled" });
+    expect(result).toMatchObject({
+      id: "cancel-1",
+      status: "cancelled",
+      amountXmr: "0",
+      amountAtomic: "0",
+      receivedXmr: null,
+      receivedAtomic: null,
+    });
+
+    const [event, data] = vi.mocked(emitWebhook).mock.calls[0];
+    expect(event).toBe("payment.cancelled");
+    expect(data).toMatchObject({ id: "cancel-1", status: "cancelled", txHash: null });
     expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith({
       where: { id: "cancel-1", status: "pending", txHash: null, paidAt: null },
       data: expect.objectContaining({ status: "cancelled" }),
@@ -222,8 +270,8 @@ describe("partial payments", () => {
       }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-1", address: "addr-topup", blockHeight: 995, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
-      { txid: "tx-2", address: "addr-topup", blockHeight: 995, amountXmr: "0.06", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-1", address: "addr-topup", blockHeight: 995, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-2", address: "addr-topup", blockHeight: 995, amountXmr: "0.06", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -244,7 +292,7 @@ describe("partial payments", () => {
       request({ id: "partial-1", address: "addr-partial", status: "pending" }),
     ] as never);
     vi.mocked(getTransfers).mockResolvedValue([
-      { txid: "tx-partial", address: "addr-partial", blockHeight: 995, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-partial", address: "addr-partial", blockHeight: 995, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
     ] as never);
 
     await settlePaymentLinks();
@@ -287,11 +335,27 @@ describe("renewPaymentLink", () => {
     const result = await renewPaymentLink("expired-link");
 
     expect(result.id).toBe("new-link");
+    expect(result).toMatchObject({
+      amountXmr: "0.1",
+      amountAtomic: "100000000000",
+      receivedXmr: null,
+      receivedAtomic: null,
+      statusUrl: "/api/payment-links/new-link/status",
+    });
+    expect(typeof result.statusToken).toBe("string");
     expect(prisma.paymentRequest.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ renewedFromId: "expired-link" }),
       })
     );
+    const [event, data] = vi.mocked(emitWebhook).mock.calls[0];
+    expect(event).toBe("payment.renewed");
+    expect(data).toMatchObject({
+      id: "new-link",
+      fromId: "expired-link",
+      amountXmr: "0.1",
+      amountAtomic: "100000000000",
+    });
   });
 
   it("refuses to renew a paid payment", async () => {

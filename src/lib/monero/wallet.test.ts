@@ -317,6 +317,7 @@ describe("payment proofs", () => {
       confirmations: 12,
       inPool: false,
       receivedXmr: "0.1",
+      receivedAtomic: "100000000000",
     });
     expect(prisma.wallet.findFirst).toHaveBeenCalled();
   });
