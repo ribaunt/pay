@@ -44,7 +44,7 @@ export async function GET() {
   // look down, which turned a busy-but-alive node into a degraded health check.
   const [daemonHeight, walletHeight] = await Promise.all([
     within(getDaemonHeight(), 0),
-    rpcNow ? within(getWalletHeight(), 0) : Promise.resolve(0),
+    rpcNow ? within(getWalletHeight().catch(() => 0), 0) : Promise.resolve(0),
   ]);
   const daemon = daemonHeight > 0;
 
