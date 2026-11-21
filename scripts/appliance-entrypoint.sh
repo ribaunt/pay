@@ -52,7 +52,7 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=pay
 PAYMENT_API_KEY=${PAYMENT_API_KEY}
 CRON_SECRET=${CRON_SECRET}
-CRON_INTERVAL_SECONDS=${CRON_INTERVAL_SECONDS:-300}
+CRON_INTERVAL_SECONDS=${CRON_INTERVAL_SECONDS:-30}
 BACKUP_PASSPHRASE=${BACKUP_PASSPHRASE}
 EOF
 
@@ -134,7 +134,7 @@ node /app/scripts/bootstrap-wallet.mjs || true
 
 # Settlement and webhook retries are cron endpoints; run them on a timer so
 # the appliance does not depend on an external scheduler.
-CRON_INTERVAL="${CRON_INTERVAL_SECONDS:-300}"
+CRON_INTERVAL="${CRON_INTERVAL_SECONDS:-30}"
 (
   while true; do
     sleep "$CRON_INTERVAL"

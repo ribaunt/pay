@@ -29,6 +29,7 @@ Every setting lives in `.env` at the repository root. Compose passes the relevan
 | `WALLET_ENCRYPTION_KEY` | none | **yes** | Exactly 64 hex characters (32 bytes) for AES-256-GCM. |
 | `PAYMENT_API_KEY` | none | **yes** | At least 24 characters; bootstrap server key. |
 | `CRON_SECRET` | none | **yes** | At least 24 characters; protects cron endpoints. |
+| `CRON_INTERVAL_SECONDS` | `30` | no | Appliance-only. Seconds between settlement and webhook dispatch sweeps. Lower is faster but increases wallet RPC and database load. |
 | `BACKUP_PASSPHRASE` | none | for backups | Passphrase for the encryption scripts. |
 
 Generate random values with `openssl rand -hex 32` or your password manager. Don't reuse a value across variables.
