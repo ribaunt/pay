@@ -20,6 +20,17 @@ model User {
   wallet       Wallet?
 }
 
+model Store {
+  id           String           @id @default(cuid())
+  name         String           @unique
+  slug         String           @unique
+  accountIndex Int              @unique
+  createdAt    DateTime         @default(now())
+  apiKeys      ApiKey[]
+  payments     PaymentRequest[]
+  webhooks     WebhookEndpoint[]
+}
+
 model ApiKey {
   id          String           @id @default(cuid())
   name        String
@@ -30,6 +41,8 @@ model ApiKey {
   expiresAt   DateTime?
   revokedAt   DateTime?
   lastUsedAt  DateTime?
+  storeId     String?
+  store       Store?            @relation(fields: [storeId], references: [id], onDelete: SetNull)
   links       PaymentRequest[]
   webhooks    WebhookEndpoint[]
 }
@@ -42,6 +55,8 @@ model WebhookEndpoint {
   enabled    Boolean           @default(true)
   apiKeyId   String?
   apiKey     ApiKey?           @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  storeId    String?
+  store      Store?            @relation(fields: [storeId], references: [id], onDelete: SetNull)
   createdAt  DateTime          @default(now())
   deliveries WebhookDelivery[]
 }
@@ -103,6 +118,8 @@ model PaymentRequest {
   id              String    @id @default(cuid())
   walletId        String
   wallet          Wallet    @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  storeId         String?
+  store           Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
   address         String
   amount          String
   uri             String

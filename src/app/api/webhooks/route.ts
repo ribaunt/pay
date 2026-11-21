@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     await rateLimit(`webhook-list:${key ? `key:${key.id}` : clientId(request)}`, 60, 60_000);
 
     const endpoints = await prisma.webhookEndpoint.findMany({
-      where: apiKeyId ? { apiKeyId } : undefined,
+      where: apiKeyId ? { apiKeyId } : key?.storeId ? { storeId: key.storeId } : undefined,
       select: { id: true, url: true, events: true, enabled: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });
@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       url: body.url,
       events: body.events,
       apiKeyId: key?.id ?? null,
+      storeId: key?.storeId ?? null,
     });
     return NextResponse.json({ webhook }, { status: 201 });
   } catch (error) {

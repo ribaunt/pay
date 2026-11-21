@@ -13,6 +13,7 @@ import { getPaymentConfig } from "@/lib/config";
 
 export type PaymentRecordLike = {
   id: string;
+  storeId?: string | null;
   address?: string | null;
   uri?: string | null;
   amount: string;
@@ -81,6 +82,7 @@ export function paymentLinkView(record: PaymentRecordLike) {
   return {
     id: record.id,
     status: record.status,
+    storeId: record.storeId ?? null,
     address: record.address ?? null,
     uri: record.uri ?? null,
     label: record.label ?? null,
@@ -109,6 +111,7 @@ export function paymentEventData(
   return {
     id: record.id,
     status: record.status,
+    storeId: record.storeId ?? null,
     address: record.address ?? null,
     ...amountPair(record.amount),
     ...receivedPair(record.receivedAtomic),

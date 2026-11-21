@@ -48,6 +48,7 @@ function tokenMatches(token: string, hash: string): boolean {
 
 export type CreateLinkOptions = {
   apiKeyId?: string;
+  storeId?: string | null;
   idempotencyKey?: string | null;
   requestBody?: unknown;
 };
@@ -61,8 +62,15 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 export async function createPaymentLink(input: CreateLinkInput, options: CreateLinkOptions = {}) {
-  const wallet = await prisma.wallet.findUnique({ where: { userId: SINGLE_USER_ID } });
+  const [wallet, store] = await Promise.all([
+    prisma.wallet.findUnique({ where: { userId: SINGLE_USER_ID } }),
+    options.storeId
+      ? prisma.store.findUnique({ where: { id: options.storeId } })
+      : Promise.resolve(null),
+  ]);
   if (!wallet) throw new Error("Wallet is not configured. Complete setup first.");
+  if (options.storeId && !store) throw new Error("API key references an unknown store");
+  const accountIndex = store?.accountIndex ?? 0;
 
   const idempotencyKeyHash =
     options.apiKeyId && options.idempotencyKey
@@ -163,6 +171,7 @@ export async function createPaymentLink(input: CreateLinkInput, options: CreateL
         expiresAt,
         publicTokenHash: hashToken(token),
         apiKeyId: options.apiKeyId ?? null,
+        storeId: options.storeId ?? null,
         idempotencyKeyHash,
         requestHash: idempotencyKeyHash ? bodyHash : null,
         idempotencyExpiresAt: idempotencyKeyHash ? new Date(Date.now() + 86_400_000) : null,
@@ -183,7 +192,7 @@ export async function createPaymentLink(input: CreateLinkInput, options: CreateL
   }
 
   try {
-    const request = await createPaymentRequestAtomic(SINGLE_USER_ID, atomic, label);
+    const request = await createPaymentRequestAtomic(SINGLE_USER_ID, atomic, label, accountIndex);
 
     const created = {
       ...reservation,
@@ -300,10 +309,14 @@ export async function renewPaymentLink(id: string) {
     };
   }
 
+  const store = previous.storeId
+    ? await prisma.store.findUnique({ where: { id: previous.storeId } })
+    : null;
   const request = await createPaymentRequestAtomic(
     SINGLE_USER_ID,
     atomic,
-    previous.label ?? "payment"
+    previous.label ?? "payment",
+    store?.accountIndex ?? 0
   );
   const token = randomBytes(32).toString("base64url");
   const { expiresAt } = resolvePaymentTimeout(undefined);
@@ -323,6 +336,7 @@ export async function renewPaymentLink(id: string) {
       requiredConfirmations: previous.requiredConfirmations,
       renewedFromId: previous.id,
       apiKeyId: previous.apiKeyId,
+      storeId: previous.storeId,
     },
   });
 
@@ -335,9 +349,12 @@ export async function renewPaymentLink(id: string) {
   };
 }
 
-export async function listPaymentLinks(status?: string) {
+export async function listPaymentLinks(status?: string, storeId?: string | null) {
   const records = await prisma.paymentRequest.findMany({
-    where: status ? { status } : undefined,
+    where: {
+      ...(status ? { status } : {}),
+      ...(storeId ? { storeId } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

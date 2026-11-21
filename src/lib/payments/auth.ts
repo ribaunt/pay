@@ -7,6 +7,7 @@ export type ApiKeyRecord = {
   id: string;
   name: string;
   scopes: string;
+  storeId: string | null;
 };
 
 function sha256(value: string): string {
@@ -57,7 +58,7 @@ export async function verifyApiKey(
     .update({ where: { id: key.id }, data: { lastUsedAt: new Date() } })
     .catch(() => {});
 
-  return { id: key.id, name: key.name, scopes: key.scopes };
+  return { id: key.id, name: key.name, scopes: key.scopes, storeId: key.storeId ?? null };
 }
 
 export async function hasLinkControl(request: Request): Promise<boolean> {

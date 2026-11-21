@@ -254,15 +254,26 @@ export type Subaddress = {
   lastUsedAt?: Date | null;
 };
 
-export async function createSubaddress(userId: string, label?: string): Promise<Subaddress> {
+export async function createSubaddress(
+  userId: string,
+  label?: string,
+  accountIndex = 0
+): Promise<Subaddress> {
   await ensureWalletOpen(userId);
 
   const result = await walletRpc<CreateAddressResult>("create_address", {
-    account_index: 0,
+    account_index: accountIndex,
     ...(label ? { label } : {}),
   });
 
   return { address: result.address, addressIndex: result.address_index, label };
+}
+
+/** Create a new Monero account (major index) for a store. */
+export async function createWalletAccount(label: string): Promise<number> {
+  await ensureWalletOpen(SINGLE_USER_ID);
+  const result = await walletRpc<{ account_index: number }>("create_account", { label });
+  return result.account_index;
 }
 
 export async function listSubaddresses(userId: string): Promise<Subaddress[]> {
@@ -355,8 +366,8 @@ export async function markSubaddressUsed(walletId: string, address: string) {
   });
 }
 
-export async function createFreshSubaddress(userId: string, label?: string) {
-  const subaddress = await createSubaddress(userId, label);
+export async function createFreshSubaddress(userId: string, label?: string, accountIndex = 0) {
+  const subaddress = await createSubaddress(userId, label, accountIndex);
   await storeSubaddress(userId, subaddress);
   return subaddress;
 }
@@ -382,11 +393,12 @@ export type PaymentRequest = {
 export async function createPaymentRequestAtomic(
   userId: string,
   atomic: bigint,
-  label?: string
+  label?: string,
+  accountIndex = 0
 ): Promise<PaymentRequest> {
   await ensureWalletOpen(userId);
 
-  const subaddress = await createFreshSubaddress(userId, label ?? "payment");
+  const subaddress = await createFreshSubaddress(userId, label ?? "payment", accountIndex);
 
   const result = await walletRpc<MakeUriResult>("make_uri", {
     address: subaddress.address,

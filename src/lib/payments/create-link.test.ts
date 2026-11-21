@@ -10,6 +10,7 @@ await vi.mock(new URL("./webhooks", import.meta.url).href, () => ({ emitWebhook:
 await vi.mock("@/lib/prisma", () => ({
   prisma: {
     wallet: { findUnique: vi.fn() },
+    store: { findUnique: vi.fn() },
     paymentRequest: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -38,7 +39,7 @@ const { prisma } = await import("@/lib/prisma");
 const { createPaymentRequestAtomic } = await import("@/lib/monero/wallet");
 const { getPriceQuote } = await import("@/lib/pricing/oracle");
 const { emitWebhook } = await import("./webhooks");
-const { createPaymentLink } = await import("./links");
+const { createPaymentLink, listPaymentLinks } = await import("./links");
 
 const LINK_RESPONSE = {
   id: "link-1",
@@ -85,6 +86,35 @@ beforeEach(() => {
   } as never);
   vi.mocked(prisma.paymentRequest.update).mockResolvedValue({} as never);
   vi.mocked(prisma.paymentRequest.findFirst).mockResolvedValue(null);
+});
+
+describe("store isolation", () => {
+  it("uses the store's Monero account and tags the link", async () => {
+    vi.mocked(prisma.store.findUnique).mockResolvedValue({
+      id: "store-1",
+      accountIndex: 7,
+    } as never);
+
+    await createPaymentLink(
+      { amountXmr: "0.1", timeoutSeconds: 0 },
+      { apiKeyId: "key-1", storeId: "store-1" }
+    );
+
+    expect(createPaymentRequestAtomic).toHaveBeenCalledWith("single-user", 100000000000n, "payment", 7);
+    expect(prisma.paymentRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ storeId: "store-1" }) })
+    );
+  });
+
+  it("filters listing by the API key's store", async () => {
+    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([]);
+
+    await listPaymentLinks(undefined, "store-1");
+
+    expect(prisma.paymentRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { storeId: "store-1" } })
+    );
+  });
 });
 
 describe("createPaymentLink", () => {

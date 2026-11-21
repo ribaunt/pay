@@ -87,6 +87,7 @@ export async function registerWebhook(options: {
   url: string;
   events?: string;
   apiKeyId?: string | null;
+  storeId?: string | null;
 }) {
   const url = assertPublicUrl(options.url);
   await assertPublicUrlResolved(url);
@@ -100,6 +101,7 @@ export async function registerWebhook(options: {
       events,
       secret: encryptSecret(secret),
       apiKeyId: options.apiKeyId ?? null,
+      storeId: options.storeId ?? null,
     },
   });
 
@@ -112,7 +114,13 @@ export async function registerWebhook(options: {
 }
 
 export async function emitWebhook(event: string, payload: Record<string, unknown>) {
-  const endpoints = await prisma.webhookEndpoint.findMany({ where: { enabled: true } });
+  const storeId = typeof payload.storeId === "string" ? payload.storeId : null;
+  const endpoints = await prisma.webhookEndpoint.findMany({
+    where: {
+      enabled: true,
+      ...(storeId ? { OR: [{ storeId: null }, { storeId }] } : { storeId: null }),
+    },
+  });
   const body = JSON.stringify({ event, createdAt: new Date().toISOString(), data: payload });
 
   const matching = endpoints.filter(

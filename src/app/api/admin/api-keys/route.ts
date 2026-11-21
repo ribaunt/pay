@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     await requireUser();
     await rateLimit(`api-key-create:${clientId(request)}`, 10, 60_000);
 
-    const body = (await request.json()) as { name?: string; scopes?: string };
+    const body = (await request.json()) as { name?: string; scopes?: string; storeId?: string };
     const name = body.name?.trim();
     const scopes = (body.scopes ?? "payment:write,payment:read").trim();
 
@@ -51,7 +51,13 @@ export async function POST(request: Request) {
     const keyHash = createHash("sha256").update(rawKey).digest("hex");
 
     const key = await prisma.apiKey.create({
-      data: { name, scopes, keyHash, prefix: `${rawKey.slice(0, 8)}...` },
+      data: {
+        name,
+        scopes,
+        keyHash,
+        prefix: `${rawKey.slice(0, 8)}...`,
+        storeId: body.storeId || null,
+      },
     });
 
     return NextResponse.json(
@@ -61,6 +67,7 @@ export async function POST(request: Request) {
           name: key.name,
           scopes: key.scopes,
           prefix: key.prefix,
+          storeId: key.storeId,
           secret: rawKey,
         },
       },

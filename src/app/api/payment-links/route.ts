@@ -21,7 +21,9 @@ export async function GET(request: Request) {
     await rateLimit(`payment-link-list:${key ? `key:${key.id}` : clientId(request)}`, 60, 60_000);
 
     const status = new URL(request.url).searchParams.get("status") ?? undefined;
-    return NextResponse.json({ links: await listPaymentLinks(status ?? undefined) });
+    return NextResponse.json({
+      links: await listPaymentLinks(status ?? undefined, key?.storeId),
+    });
   } catch (error) {
     return apiError(error, "Failed to list payment links");
   }
@@ -47,6 +49,7 @@ export async function POST(request: Request) {
     const idempotencyKey = request.headers.get("idempotency-key");
     const link = await createPaymentLink(body, {
       apiKeyId: key.id,
+      storeId: key.storeId,
       idempotencyKey,
       requestBody: body,
     });
