@@ -17,6 +17,7 @@ export function getPaymentConfig() {
     maxTimeoutSeconds: intEnv("PAYMENT_MAX_TIMEOUT_SECONDS", 86400),
     requiredConfirmations: intEnv("PAYMENT_REQUIRED_CONFIRMATIONS", 10),
     maxSyncLagBlocks: intEnv("HEALTH_MAX_SYNC_LAG_BLOCKS", 10),
+    allowZeroConf: process.env.PAYMENT_ALLOW_ZERO_CONF === "1",
   };
 }
 

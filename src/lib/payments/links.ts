@@ -32,6 +32,7 @@ export type CreateLinkInput = {
   amountXmr?: unknown;
   timeoutSeconds?: unknown;
   requiredConfirmations?: unknown;
+  zeroConf?: unknown;
   label?: unknown;
   description?: unknown;
 };
@@ -154,6 +155,15 @@ export async function createPaymentLink(input: CreateLinkInput, options: CreateL
     requiredConfirmations = value;
   }
 
+  let zeroConf = false;
+  if (input.zeroConf !== undefined && input.zeroConf !== null) {
+    if (typeof input.zeroConf !== "boolean") throw new Error("Invalid zeroConf");
+    if (input.zeroConf && !getPaymentConfig().allowZeroConf) {
+      throw new Error("Zero-confirmation links are disabled on this server");
+    }
+    zeroConf = input.zeroConf;
+  }
+
   const label = optionalLabel(input.label) ?? "payment";
   const { expiresAt } = resolvePaymentTimeout(input.timeoutSeconds);
   const token = randomBytes(32).toString("base64url");
@@ -176,6 +186,7 @@ export async function createPaymentLink(input: CreateLinkInput, options: CreateL
         requestHash: idempotencyKeyHash ? bodyHash : null,
         idempotencyExpiresAt: idempotencyKeyHash ? new Date(Date.now() + 86_400_000) : null,
         requiredConfirmations,
+        zeroConf,
         ...fiatData,
       },
     });
@@ -334,6 +345,7 @@ export async function renewPaymentLink(id: string) {
       fiatCurrency: previous.fiatCurrency,
       ...quoteData,
       requiredConfirmations: previous.requiredConfirmations,
+      zeroConf: previous.zeroConf,
       renewedFromId: previous.id,
       apiKeyId: previous.apiKeyId,
       storeId: previous.storeId,
@@ -473,8 +485,10 @@ async function settlePaymentLinksInner() {
       const required = request.requiredConfirmations ?? defaultConfirmations;
       const isLate = request.status === "expired" || request.status === "late";
 
+      const covered = received >= expected;
       let status: string;
       if (isLate) status = "late";
+      else if (request.zeroConf && covered && confirmations === 0) status = "confirmed";
       else if (received < expected) status = "underpaid";
       else if (received > expected && confirmations < required) status = "overpaid";
       else if (confirmations >= required) status = "confirmed";

@@ -30,6 +30,7 @@ export type PaymentRecordLike = {
   rateDegraded?: boolean;
   requiredConfirmations?: number | null;
   confirmations?: number;
+  zeroConf?: boolean;
   txHash?: string | null;
   createdAt?: Date | string;
   expiresAt?: Date | string | null;
@@ -63,6 +64,25 @@ export function receivedPair(value?: string | bigint | number | null) {
   };
 }
 
+/** Coverage fields shared by API views and webhook payloads. */
+function coverageFields(record: PaymentRecordLike, required: number, confirmations: number) {
+  const expected = BigInt(atomic(record.amount) ?? "0");
+  const received = BigInt(atomic(record.receivedAtomic) ?? "0");
+  const covered = received > expected ? expected : received;
+  const zeroConf = record.zeroConf ?? false;
+  const complete = received >= expected;
+  const unlocked = complete && (zeroConf || confirmations >= required) ? covered : 0n;
+
+  return {
+    zeroConf,
+    coveredXmr: atomicToXmr(covered),
+    coveredAtomic: covered.toString(),
+    unlockedXmr: atomicToXmr(unlocked),
+    unlockedAtomic: unlocked.toString(),
+    complete,
+  };
+}
+
 function rateFields(record: PaymentRecordLike) {
   return {
     rateUsd: record.rateUsd ?? null,
@@ -88,6 +108,7 @@ export function paymentLinkView(record: PaymentRecordLike) {
     label: record.label ?? null,
     ...amountPair(record.amount),
     ...receivedPair(record.receivedAtomic),
+    ...coverageFields(record, required, confirmations),
     fiatAmount: record.fiatAmount ?? null,
     fiatCurrency: record.fiatCurrency ?? null,
     ...rateFields(record),
@@ -115,6 +136,11 @@ export function paymentEventData(
     address: record.address ?? null,
     ...amountPair(record.amount),
     ...receivedPair(record.receivedAtomic),
+    ...coverageFields(
+      record,
+      record.requiredConfirmations ?? getPaymentConfig().requiredConfirmations,
+      record.confirmations ?? 0
+    ),
     fiatAmount: record.fiatAmount ?? null,
     fiatCurrency: record.fiatCurrency ?? null,
     txHash: record.txHash ?? null,

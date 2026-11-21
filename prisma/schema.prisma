@@ -152,6 +152,8 @@ model PaymentRequest {
   idempotencyExpiresAt DateTime?
   requiredConfirmations Int?
   receivedAtomic       String?
+  // When true, a fully covered mempool transfer is treated as confirmed.
+  zeroConf             Boolean   @default(false)
   renewedFromId        String?
 
   transfers PaymentRequestTransfer[]

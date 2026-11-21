@@ -197,6 +197,23 @@ describe("settlePaymentLinks", () => {
     );
   });
 
+  it("confirms a covered zero-conf payment in the mempool", async () => {
+    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+      request({ id: "zero-1", address: "addr-zero", status: "detected", zeroConf: true }),
+    ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([
+      { txHash: "tx-zero", address: "addr-zero", blockHeight: 0, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+    ] as never);
+
+    await settlePaymentLinks();
+
+    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "confirmed", confirmations: 0 }),
+      })
+    );
+  });
+
   it("marks a mostly confirmed payment as confirming", async () => {
     vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
       request({ id: "confirm-1", address: "addr-3", status: "detected" }),

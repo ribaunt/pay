@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       amountXmr?: string;
       timeoutSeconds?: number;
       requiredConfirmations?: number;
+      zeroConf?: boolean;
       label?: string;
       description?: string;
     };

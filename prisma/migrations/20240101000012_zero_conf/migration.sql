@@ -1,0 +1,1 @@
+ALTER TABLE "PaymentRequest" ADD COLUMN "zeroConf" BOOLEAN NOT NULL DEFAULT false;
