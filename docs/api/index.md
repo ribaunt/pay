@@ -34,10 +34,29 @@ There's no registration endpoint. The only credentials are `SINGLE_USER_EMAIL` a
 ## Conventions
 
 - Request bodies are JSON with `content-type: application/json`.
-- All timestamps are ISO 8601 strings.
-- XMR amounts in responses are decimal strings; internally they are integer piconero.
+- All timestamps are ISO 8601 strings, or `null` when not applicable.
 - Errors are `{"error": "message"}` with an HTTP status code. See [Errors and limits](../reference/errors-and-limits.md).
 - Repeated requests are rate-limited per API key or per client bucket. Exceeding a limit returns `429`.
+
+### Standardized field names
+
+Every surface — API responses, the audit export, and webhook payloads — uses the
+same vocabulary. No endpoint returns a raw database row.
+
+| Concept | Field(s) | Notes |
+| --- | --- | --- |
+| Requested amount | `amountXmr`, `amountAtomic` | Decimal XMR string and integer piconero string. Always both. |
+| Received amount | `receivedXmr`, `receivedAtomic` | Both `null` until a transfer is detected. |
+| Wallet balance | `balanceXmr`, `balanceAtomic`, `unlockedBalanceXmr`, `unlockedBalanceAtomic` | Both forms on `/api/wallet` and `/api/wallet/balance`. |
+| Transaction id | `txHash` | Never `txid` on the wire. |
+| Price rate | `rateUsd`, `fxRate`, `rateSources`, `rateFetchedAt`, `rateStale`, `rateDegraded` | `rateSources` is a comma-separated string. |
+| Confirmations | `confirmations`, `requiredConfirmations`, `confirmationsRemaining` | Integers. |
+| Timestamps | `createdAt`, `expiresAt`, `paidAt`, `cancelledAt`, `lateDetectedAt`, `rateFetchedAt` | ISO strings or `null`. |
+
+All payment-link responses (create, renew, list, status, audit, and
+`POST /api/wallet/payment-requests`) share one shape: [`PaymentLink`](../reference/types.md#paymentlink).
+Create and renew additionally include `statusUrl` and `statusToken`.
+Webhook `data` is built from the same fields plus the event `status`.
 
 ## Endpoints
 

@@ -72,6 +72,12 @@ Optional header: `Idempotency-Key`. It's scoped to the API key and lasts 24 hour
 
 Keep `statusToken` on your server. Show `uri` or `address` plus `amountXmr` to the customer.
 
+The `link` object is the standard [`PaymentLink`](../reference/types.md#paymentlink)
+shape: every payment-link endpoint (create, renew, list, status, audit, and
+`POST /api/wallet/payment-requests`) returns the same fields, including both
+`amountXmr`/`amountAtomic` and `receivedXmr`/`receivedAtomic`. Create and renew
+add `statusUrl` and `statusToken`. Fields not yet applicable are `null`.
+
 | Error | When |
 | --- | --- |
 | `400` | Neither amount provided, invalid amount, invalid currency, bad timeout or confirmation count. |

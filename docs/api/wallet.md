@@ -51,8 +51,8 @@ The view key is encrypted before storage and never returned. Spend keys are neve
 
 | Method | Path | Response |
 | --- | --- | --- |
-| `GET` | `/api/wallet` | `{ "wallet": { name, address, balanceXmr, unlockedBalanceXmr, blocksToUnlock } }` |
-| `GET` | `/api/wallet/balance` | `{ "balanceXmr": "0.5", "unlockedBalanceXmr": "0.3", "blocksToUnlock": 10 }` |
+| `GET` | `/api/wallet` | `{ "wallet": { name, address, balanceXmr, balanceAtomic, unlockedBalanceXmr, unlockedBalanceAtomic, blocksToUnlock } }` |
+| `GET` | `/api/wallet/balance` | `{ "balanceXmr": "0.5", "balanceAtomic": "500000000000", "unlockedBalanceXmr": "0.3", "unlockedBalanceAtomic": "300000000000", "blocksToUnlock": 10 }` |
 | `GET` | `/api/wallet/address` | `{ "address": "4..." }` |
 
 ## Transfers
@@ -78,10 +78,12 @@ curl 'https://pay.example.com/api/wallet/transfers?incoming=1&pool=1' \
 {
   "transfers": [
     {
-      "txid": "3e4f...",
+      "txHash": "3e4f...",
       "type": "in",
       "amountXmr": "0.01",
+      "amountAtomic": "10000000000",
       "feeXmr": "0.000012",
+      "feeAtomic": "12000000",
       "timestamp": "2026-11-18T14:02:11.000Z",
       "blockHeight": 3401000,
       "address": "8A...",
@@ -145,7 +147,7 @@ curl 'https://pay.example.com/api/wallet/audit?format=csv' \
   -o pay-audit.csv
 ```
 
-The CSV has columns `id`, `label`, `status`, `address`, `amountXmr`, `receivedXmr`, `fiatAmount`, `fiatCurrency`, `txHash`, `confirmations`, `createdAt`, `paidAt`, `network`. Cells beginning with `=`, `+`, `-`, `@`, tab, or carriage return are escaped to prevent spreadsheet formula injection.
+The CSV has columns `id`, `label`, `status`, `address`, `amountXmr`, `amountAtomic`, `receivedXmr`, `receivedAtomic`, `fiatAmount`, `fiatCurrency`, `txHash`, `confirmations`, `createdAt`, `paidAt`, `network`. Cells beginning with `=`, `+`, `-`, `@`, tab, or carriage return are escaped to prevent spreadsheet formula injection.
 
 ## Close the wallet
 

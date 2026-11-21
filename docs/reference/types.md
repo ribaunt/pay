@@ -22,55 +22,60 @@ type CreateLinkInput = {
 };
 ```
 
-### `CreateLinkResponse`
+### `PaymentLink`
 
-Returned as `{ "link": CreateLinkResponse }` with status `201`.
+One canonical shape is used by every payment-link surface: create, renew,
+list, status, the audit report, and `POST /api/wallet/payment-requests`.
+Create and renew wrap it as `{ "link": PaymentLink & CreatedLink }`; status and
+list return it directly. Fields that don't apply yet are `null`.
 
 ```ts
-type CreateLinkResponse = {
+type PaymentLink = {
   id: string;
-  uri: string;                  // monero: URI
-  address: string;              // fresh subaddress
-  amountXmr: string;
+  status: LinkStatus;
+  address: string | null;
+  uri: string | null;           // monero: URI
+  label: string | null;
+
+  amountXmr: string;            // decimal XMR
   amountAtomic: string;         // piconero
+  receivedXmr: string | null;
+  receivedAtomic: string | null;
+
   fiatAmount: string | null;
   fiatCurrency: string | null;
   rateUsd: string | null;
-  rateSources: string | null;
-  requiredConfirmations: number | null;
-  status: "pending";
-  expiresAt: string | null;     // ISO 8601
-  statusUrl: string;            // path, not absolute
-  statusToken: string;          // base64url, shown once
-};
-```
+  fxRate: string | null;
+  rateSources: string | null;   // comma-separated
+  rateFetchedAt: string | null; // ISO 8601
+  rateStale: boolean;
+  rateDegraded: boolean;
 
-### `PaymentLinkStatus`
+  requiredConfirmations: number;
+  confirmations: number;
+  confirmationsRemaining: number;
+  txHash: string | null;
 
-```ts
-type PaymentLinkStatus = {
-  id: string;
-  status: LinkStatus;
-  amountXmr: string;
-  amountAtomic: string;
-  fiatAmount: string | null;
-  fiatCurrency: string | null;
+  createdAt: string | null;
   expiresAt: string | null;
   paidAt: string | null;
   cancelledAt: string | null;
   lateDetectedAt: string | null;
-  txHash: string | null;
-  confirmations: number;
-  receivedAtomic: string | null;
-  receivedXmr: string | null;
-  requiredConfirmations: number;
-  confirmationsRemaining: number;
+};
+
+type CreatedLink = PaymentLink & {
+  statusUrl: string;            // path, not absolute
+  statusToken: string;          // base64url, shown once
 };
 
 type LinkStatus =
   | "pending" | "detected" | "confirming" | "confirmed"
   | "underpaid" | "overpaid" | "expired" | "late" | "cancelled";
 ```
+
+Webhook `data` uses the same vocabulary — `status`, both amount pairs,
+`txHash`, `fiatAmount`, `fiatCurrency`, `confirmations`, `expiresAt`, `paidAt` —
+plus `fromId` on `payment.renewed`. There is no `txid` field anywhere on the wire.
 
 ## Wallet types
 
@@ -123,6 +128,7 @@ type PaymentProofVerification = {
   confirmations: number;
   inPool: boolean;
   receivedXmr: string;
+  receivedAtomic: string;
 };
 ```
 
@@ -131,7 +137,7 @@ type PaymentProofVerification = {
 ```ts
 type PriceQuote = {
   currency: string;
-  usdPerXmr: number;
+  usdPerXmr: number;    // internal oracle value
   fiatPerUsd: number;
   sources: string[];
   fetchedAt: string;
@@ -144,12 +150,12 @@ type QuoteResponse = {
   fiatCurrency: string;
   amountXmr: string;
   amountAtomic: string;
-  usdPerXmr: number;
-  fiatPerUsd: number;
-  sources: string[];
-  stale: boolean;
-  degraded: boolean;
-  fetchedAt: string;
+  rateUsd: string;        // same rate* vocabulary as PaymentLink
+  fxRate: string;
+  rateSources: string;    // comma-separated
+  rateFetchedAt: string;
+  rateStale: boolean;
+  rateDegraded: boolean;
 };
 ```
 
@@ -187,7 +193,10 @@ type WebhookEvent =
 type WebhookPayload = {
   event: WebhookEvent;
   createdAt: string;
-  data: Record<string, unknown>;  // usually id, txHash, confirmations, receivedAtomic
+  // Canonical payment fields: status, address, both amount pairs, fiatAmount,
+  // fiatCurrency, txHash, confirmations, expiresAt, paidAt. payment.renewed
+  // also carries fromId.
+  data: Record<string, unknown>;
 };
 
 type WebhookRegistration = {

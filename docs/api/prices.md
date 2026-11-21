@@ -39,24 +39,27 @@ curl 'https://pay.example.com/api/prices/quote?fiatAmount=10.50&fiatCurrency=EUR
   "fiatCurrency": "EUR",
   "amountXmr": "0.038888888888",
   "amountAtomic": "38888888888000",
-  "usdPerXmr": 278.4,
-  "fiatPerUsd": 0.92,
-  "sources": ["coingecko", "coincap", "coinbase", "kraken", "frankfurter"],
-  "stale": false,
-  "degraded": false,
-  "fetchedAt": "2026-11-18T14:00:00.000Z"
+  "rateUsd": "278.4",
+  "fxRate": "0.92",
+  "rateSources": "coingecko,coincap,coinbase,kraken,frankfurter",
+  "rateStale": false,
+  "rateDegraded": false,
+  "rateFetchedAt": "2026-11-18T14:00:00.000Z"
 }
 ```
 
 | Field | Meaning |
 | --- | --- |
 | `amountXmr`, `amountAtomic` | The converted amount, rounded up so the merchant receives at least the quoted value. |
-| `usdPerXmr` | Median XMR/USD price from available sources. |
-| `fiatPerUsd` | FX rate; `1` for USD. |
-| `sources` | Contributing sources. |
-| `stale` | A cached quote was served because live sources failed. |
-| `degraded` | Fewer than two usable values were available, so the median is less robust. |
-| `fetchedAt` | When the quote was fetched. |
+| `rateUsd` | Median XMR/USD price from available sources. |
+| `fxRate` | FX rate; `1` for USD. |
+| `rateSources` | Comma-separated contributing sources. |
+| `rateStale` | A cached quote was served because live sources failed. |
+| `rateDegraded` | Fewer than two usable values were available, so the median is less robust. |
+| `rateFetchedAt` | When the quote was fetched. |
+
+These are the same `rate*` fields stored on a payment link, so a quote and the
+link created from it can be compared directly.
 
 ## How the price is assembled
 

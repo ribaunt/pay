@@ -92,11 +92,25 @@ x-pay-signature: sha256=<hex>
   "createdAt": "2026-11-18T14:12:33.000Z",
   "data": {
     "id": "clh1234567890",
+    "status": "confirmed",
+    "address": "8A...",
+    "amountXmr": "0.01",
+    "amountAtomic": "10000000000",
+    "receivedXmr": "0.01",
+    "receivedAtomic": "10000000000",
+    "fiatAmount": "10",
+    "fiatCurrency": "USD",
     "txHash": "3e4f...",
     "confirmations": 10,
-    "receivedAtomic": "10000000000"
+    "expiresAt": "2026-11-18T14:30:00.000Z",
+    "paidAt": "2026-11-18T14:02:11.000Z"
   }
 }
 ```
+
+Every payment event carries this same `data` shape, so consumers never need
+per-event field handling. `txHash` is used (never `txid`), and amounts always
+appear as both `Xmr` and `Atomic` strings. `payment.renewed` adds `fromId`.
+Unset timestamps and amounts are `null`.
 
 The signature is `sha256=` plus the HMAC-SHA256 of `deliveryId + "." + event + "." + rawBody` using the endpoint secret. Deduplicate on `x-pay-delivery-id`; retries reuse the same ID.
