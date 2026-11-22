@@ -210,6 +210,7 @@ jobs:
             echo release/install.sh
             echo release/compose.yml
             echo release/README.md
+            echo NOTICE
           } >> /tmp/asset-files
           sha256sum $(cat /tmp/asset-files) > checksums.txt
 
@@ -223,6 +224,7 @@ jobs:
             release/install.sh \
             release/compose.yml \
             release/README.md \
+            NOTICE \
             checksums.txt \
             $(find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name '*.digest.txt' \) -print | sort)
 

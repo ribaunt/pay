@@ -56,7 +56,11 @@ RUN ARCH="$(uname -m)"; \
  && echo "${EXPECTED}  /tmp/monero.tar.bz2" | sha256sum -c - \
  && mkdir -p /opt/monero \
  && tar -xjf /tmp/monero.tar.bz2 -C /opt/monero --strip-components=1 \
- && find /opt/monero -maxdepth 1 -type f ! -name monero-wallet-rpc -delete \
+ && find /opt/monero -maxdepth 1 -type f \
+       ! -name monero-wallet-rpc \
+       ! -iname 'LICENSE*' \
+       ! -iname 'COPYING*' \
+       -delete \
  && chmod +x /opt/monero/monero-wallet-rpc
 
 # ---------- appliance runtime ----------
@@ -94,6 +98,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nextjs /app/node_modules ./node_modules
 COPY --from=wallet-binary /opt/monero/monero-wallet-rpc /usr/local/bin/monero-wallet-rpc
+COPY NOTICE /usr/share/doc/monero/LICENSE
+COPY NOTICE /usr/share/doc/ribaunt-pay/NOTICE
 COPY scripts/appliance-entrypoint.sh /usr/local/bin/appliance-entrypoint.sh
 RUN chmod +x /usr/local/bin/appliance-entrypoint.sh /usr/local/bin/monero-wallet-rpc
 

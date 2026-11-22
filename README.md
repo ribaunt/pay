@@ -199,3 +199,9 @@ Verified live: security headers, header-only cron secret, status token via heade
 ## License
 
 Ribaunt Pay is released under the [Apache License 2.0](LICENSE).
+
+The `monero-wallet-rpc` binary shipped in the wallet and appliance images is a
+third-party component licensed under BSD-3-Clause, with portions under MIT. Its
+notices are reproduced in [NOTICE](NOTICE), which is also included in the images
+and release assets. Monero's name is used only to describe compatibility; it is
+not an endorsement.

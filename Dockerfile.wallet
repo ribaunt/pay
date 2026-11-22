@@ -46,7 +46,11 @@ RUN ARCH="$(uname -m)"; \
  && mkdir -p /opt/monero \
  && tar -xjf /tmp/monero.tar.bz2 -C /opt/monero --strip-components=1 \
  && rm -f /tmp/monero.tar.bz2 /tmp/hashes.txt /tmp/hashes.txt.sig \
- && find /opt/monero -maxdepth 1 -type f ! -name monero-wallet-rpc -delete \
+ && find /opt/monero -maxdepth 1 -type f \
+       ! -name monero-wallet-rpc \
+       ! -iname 'LICENSE*' \
+       ! -iname 'COPYING*' \
+       -delete \
  && chmod +x /opt/monero/monero-wallet-rpc
 
 ENV PATH="/opt/monero:${PATH}"
@@ -65,6 +69,7 @@ EXPOSE 18082
 ENV MONERO_NETWORK=mainnet
 
 COPY scripts/wallet-entrypoint.sh /usr/local/bin/wallet-entrypoint.sh
+COPY NOTICE /usr/share/doc/ribaunt-pay/NOTICE
 RUN chmod +x /usr/local/bin/wallet-entrypoint.sh
 
 # MONERO_RPC_USER / MONERO_RPC_PASSWORD must be supplied at runtime.
