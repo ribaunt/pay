@@ -3,6 +3,7 @@
  *   npm run seed
  */
 export {};
+import { redact } from "../src/lib/redact";
 const API = process.env.SEED_API_URL ?? "http://localhost:3001";
 
 const WALLETS = {
@@ -22,30 +23,38 @@ const network = (process.env.MONERO_NETWORK ?? "mainnet").toLowerCase() as keyof
 const wallet = WALLETS[network] ?? WALLETS.mainnet;
 
 async function call(path: string, init: RequestInit = {}, cookie?: string) {
+  const csrf = cookie?.match(/(?:^|;\s*)pay_csrf=([^;]+)/)?.[1];
   const response = await fetch(`${API}${path}`, {
     ...init,
     headers: {
       "content-type": "application/json",
+      origin: API,
       ...(cookie ? { cookie } : {}),
+      ...(csrf ? { "x-csrf-token": decodeURIComponent(csrf) } : {}),
       ...(init.headers ?? {}),
     },
   });
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
-  return { response, data };
+  return { response, data, cookies: response.headers.getSetCookie() };
 }
 
 async function main() {
+  const csrf = await call("/api/auth/csrf");
+  if (!csrf.response.ok) throw new Error(`CSRF token request failed: ${JSON.stringify(csrf.data)}`);
+  const csrfCookie = csrf.cookies.find((value) => value.startsWith("pay_csrf="))?.split(";")[0] ?? "";
+
   const login = await call("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({
       email: process.env.SINGLE_USER_EMAIL,
       password: process.env.SINGLE_USER_PASSWORD,
     }),
-  });
+  }, csrfCookie);
   if (!login.response.ok) throw new Error(`Login failed: ${JSON.stringify(login.data)}`);
 
-  const cookie = login.response.headers.get("set-cookie")?.split(";")[0] ?? "";
+  const sessionCookie = login.cookies.find((value) => value.startsWith("pay_session="))?.split(";")[0] ?? "";
+  const cookie = [sessionCookie, csrfCookie].filter(Boolean).join("; ");
 
   const existing = await call("/api/wallet", {}, cookie);
   if (!existing.response.ok || !existing.data.wallet) {
@@ -84,7 +93,7 @@ async function main() {
       cookie
     );
     if (!created.response.ok) throw new Error(`Payment creation failed: ${JSON.stringify(created.data)}`);
-    console.log(`Created ${label}: ${created.data.payment.address}`);
+    console.log(`Created ${label}: ${redact(created.data.payment.address)}`);
   }
 
   console.log("Seed complete.");

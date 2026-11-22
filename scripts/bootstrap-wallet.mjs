@@ -26,10 +26,21 @@ async function waitForApi() {
   throw new Error("API did not become reachable in time");
 }
 
-async function login() {
+function cookieFrom(headers, name) {
+  return headers.getSetCookie().find((value) => value.startsWith(`${name}=`))?.split(";")[0] ?? "";
+}
+
+async function csrfToken() {
+  const response = await fetch(`${base}/api/auth/csrf`, { signal: AbortSignal.timeout(10000) });
+  if (!response.ok) throw new Error(`csrf request failed with HTTP ${response.status}`);
+  const { token } = await response.json();
+  return { cookie: cookieFrom(response.headers, "pay_csrf"), token };
+}
+
+async function login(csrfCookie) {
   const response = await fetch(`${base}/api/auth/login`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", origin: base, cookie: csrfCookie },
     body: JSON.stringify({
       email: process.env.SINGLE_USER_EMAIL,
       password: process.env.SINGLE_USER_PASSWORD,
@@ -37,12 +48,13 @@ async function login() {
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`sign-in failed with HTTP ${response.status}`);
-  return response.headers.get("set-cookie")?.split(";")[0] ?? "";
+  return cookieFrom(response.headers, "pay_session");
 }
 
 async function main() {
   await waitForApi();
-  const cookie = await login();
+  const csrf = await csrfToken();
+  const cookie = [await login(csrf.cookie), csrf.cookie].filter(Boolean).join("; ");
 
   const current = await fetch(`${base}/api/wallet`, {
     headers: { cookie },
@@ -65,13 +77,18 @@ async function main() {
     try {
       const response = await fetch(`${base}/api/wallet/setup`, {
         method: "POST",
-        headers: { "content-type": "application/json", cookie },
+        headers: {
+          "content-type": "application/json",
+          origin: base,
+          cookie,
+          "x-csrf-token": csrf.token,
+        },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(120000),
       });
       if (response.ok) {
         const { wallet } = await response.json();
-        console.log(`wallet bootstrap: configured ${wallet.address}`);
+        console.log(`wallet bootstrap: configured ${String(wallet.address).replace(/\b[45789][0-9A-Za-z]{94}\b/g, "<redacted-monero-address>")}`);
         return;
       }
       lastError = new Error(`HTTP ${response.status}: ${await response.text()}`);
