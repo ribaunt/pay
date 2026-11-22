@@ -34,6 +34,11 @@ PORT=3000
 HOSTNAME=0.0.0.0
 SESSION_SECRET=${SESSION_SECRET}
 WALLET_ENCRYPTION_KEY=${WALLET_ENCRYPTION_KEY}
+WALLET_ENCRYPTION_KEY_ID=${WALLET_ENCRYPTION_KEY_ID:-env-1}
+WALLET_ENCRYPTION_PREVIOUS_KEYS=${WALLET_ENCRYPTION_PREVIOUS_KEYS:-}
+RETENTION_PAYMENT_REQUESTS_DAYS=${RETENTION_PAYMENT_REQUESTS_DAYS:-365}
+RETENTION_WEBHOOK_DELIVERIES_DAYS=${RETENTION_WEBHOOK_DELIVERIES_DAYS:-30}
+RETENTION_RATE_LIMIT_BUCKETS_DAYS=${RETENTION_RATE_LIMIT_BUCKETS_DAYS:-1}
 MONERO_RPC_USER=monero
 MONERO_RPC_PASSWORD=${MONERO_RPC_PASSWORD}
 MONERO_WALLET_PASSWORD=${MONERO_WALLET_PASSWORD}
@@ -136,6 +141,7 @@ node /app/scripts/bootstrap-wallet.mjs || true
 # the appliance does not depend on an external scheduler.
 CRON_INTERVAL="${CRON_INTERVAL_SECONDS:-30}"
 (
+  ticks=0
   while true; do
     sleep "$CRON_INTERVAL"
     curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/payment-links \
@@ -144,6 +150,13 @@ CRON_INTERVAL="${CRON_INTERVAL_SECONDS:-30}"
       -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
     curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/wallet-store \
       -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
+    # Retention is cheap but unnecessary every tick; run roughly hourly.
+    ticks=$((ticks + 1))
+    if [ "$ticks" -ge 120 ]; then
+      ticks=0
+      curl -sf --max-time 60 -X POST http://127.0.0.1:3000/api/cron/retention \
+        -H "x-cron-secret: $CRON_SECRET" >/dev/null 2>&1 || true
+    fi
   done
 ) &
 CRON_PID=$!

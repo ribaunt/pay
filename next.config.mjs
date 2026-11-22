@@ -14,7 +14,15 @@ const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    // Operators who terminate TLS and set HSTS at the proxy can disable the
+    // app header to avoid duplicate/conflicting HSTS policies.
+    const headers = process.env.HSTS_HEADER === "0"
+      ? securityHeaders
+      : [
+          ...securityHeaders,
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+        ];
+    return [{ source: "/(.*)", headers }];
   },
 };
 
