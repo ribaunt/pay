@@ -23,7 +23,7 @@ Ribaunt Pay is built around a simple idea: accepting a payment should not requir
 The server does keep data, because it has to:
 
 - The primary address, restore height, and a description.
-- The private view key, encrypted with AES-256-GCM before it reaches PostgreSQL (`v1.<iv>.<tag>.<ciphertext>`).
+- The private view key, encrypted with AES-256-GCM before it reaches PostgreSQL. The envelope is `v2.<key_id>.<iv>.<tag>.<ciphertext>` with authenticated additional data binding it to its purpose and record id. Legacy `v1` records remain readable.
 - Payment requests with amounts, subaddresses, expiries, transaction hashes, and confirmation counts.
 - Fresh subaddresses and whether they were used.
 - Payment proofs and their signatures.
@@ -45,7 +45,9 @@ Wallet files are encrypted with `MONERO_WALLET_PASSWORD` and live in a dedicated
 
 ## Accounts and access
 
-There's exactly one account, defined by `SINGLE_USER_EMAIL` and `SINGLE_USER_PASSWORD` in `.env`. There's no `/api/auth/register` and no anonymous session. Sessions are HMAC-signed, HTTP-only, SameSite=Lax, and Secure in production. Logging out increments the user's session version, which invalidates every older cookie.
+There's exactly one account, defined by `SINGLE_USER_EMAIL` and `SINGLE_USER_PASSWORD` in `.env`. There's no `/api/auth/register` and no anonymous session. Sessions are HMAC-signed, HTTP-only, SameSite=Lax, and Secure in production. Logging out increments the user's session version, which invalidates every older cookie. Credential comparison is constant-time and login is rate limited per source and per account.
+
+Cookie-authenticated mutations additionally require a strict same-origin `Origin` header and a CSRF token issued by `GET /api/auth/csrf`. API-key requests do not carry the session cookie and are deliberately exempt from browser CSRF rules.
 
 Server-to-server access uses scoped API keys. The bootstrap key in `.env` is stored as a hash on first use, and each additional key can be revoked independently. Cron endpoints use a separate shared secret.
 
@@ -57,14 +59,30 @@ Webhook URLs are validated before registration and again before delivery:
 
 - HTTPS only in production.
 - No embedded credentials.
-- No private, loopback, link-local, or `.local`/`.internal` hosts, checked both as literals and after DNS resolution.
-- Redirects disabled.
+- No private, loopback, link-local, or `.local`/`.internal` hosts, checked both as literals and after DNS resolution. All A and AAAA records are checked; a mixed public/private response is rejected.
+- The outbound connection is pinned to a validated IP while the original hostname is preserved for TLS verification and the `Host` header. This closes the DNS rebinding gap between validation and connection.
+- Redirects disabled, response size and connection limits enforced, and validation repeated on every delivery.
 
-This prevents someone with `webhook:write` from using the app to probe your internal network.
+This prevents someone with `webhook:write` from using the app to probe your internal network. Network-level egress restrictions are still recommended as a second layer.
 
 ## Transport and headers
 
-TLS and reverse proxying are deliberately left to the deployment environment. The app sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a restrictive content security policy on every response.
+TLS and reverse proxying are deliberately left to the deployment environment. The app sets `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security`, and a restrictive content security policy on every response. See the [production deployment checklist](../guides/production-checklist.md).
+
+## Data retention
+
+Retention is configurable per record category and never applied to open payment
+requests. Defaults are conservative because merchants may need records for
+accounting, reconciliation and dispute resolution:
+
+- Completed/cancelled payment requests: 365 days by default.
+- Webhook deliveries: 30 days by default.
+- Rate-limit buckets: 1 day by default.
+- View key, primary address and API key hashes: retained indefinitely.
+
+Set `RETENTION_*_DAYS=0` to disable purging a category and run the retention cron
+endpoint after each release. Records may be needed for legitimate accounting
+purposes, so do not set aggressive values without reviewing that need.
 
 CI generates SPDX SBOMs with Syft and signs them with cosign, with pinned tool versions and verified download hashes.
 
@@ -76,3 +94,5 @@ CI generates SPDX SBOMs with Syft and signs them with cosign, with pinned tool v
 - If you publish clearnet ports, your reverse proxy will see client addresses unless you configure it otherwise.
 
 For a fully private deployment use `tor-only` or `i2p-only`, point the daemon at a node you control, and route it through a SOCKS proxy.
+
+For attacker capabilities, trust boundaries and compromise scenarios, see the [threat model](threat-model.md). To report a vulnerability, see the [security policy](security.md).

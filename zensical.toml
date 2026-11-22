@@ -22,6 +22,7 @@ nav = [
   { "Guides" = [
     "guides/index.md",
     { "Docker deployment" = "guides/docker-deployment.md" },
+    { "Production checklist" = "guides/production-checklist.md" },
     { "Watch-only wallet" = "guides/watch-only-wallet.md" },
     { "Payment links" = "guides/payment-links.md" },
     { "Payment proofs" = "guides/payment-proofs.md" },
@@ -39,6 +40,8 @@ nav = [
     "architecture/index.md",
     { "Payment lifecycle" = "architecture/payment-lifecycle.md" },
     { "Privacy model" = "architecture/privacy-model.md" },
+    { "Threat model" = "architecture/threat-model.md" },
+    { "Security policy" = "architecture/security.md" },
     { "Data model" = "architecture/data-model.md" },
   ] },
   { "API" = [

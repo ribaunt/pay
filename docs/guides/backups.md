@@ -69,3 +69,47 @@ Even though the database dump is encrypted, the view keys inside it are already 
 - Keep `.env`, `./backups`, and any temporary restore directory at mode `600`/`700`.
 - Rotate the backup passphrase by creating a fresh backup with the new value; old backups remain under the old passphrase.
 - Back up before upgrades and before changing `WALLET_ENCRYPTION_KEY` or `MONERO_WALLET_PASSWORD`.
+
+## Rotating the encryption key
+
+Ciphertext uses a versioned envelope (`v2.<key_id>.<iv>.<tag>.<ciphertext>`) with
+authenticated additional data. Plan a rotation as follows:
+
+1. Generate a new 32-byte key with `openssl rand -hex 32` and set a new
+   `WALLET_ENCRYPTION_KEY_ID` (for example `env-2`).
+2. Keep the old key available in `WALLET_ENCRYPTION_PREVIOUS_KEYS` as
+   `env-1:<old-64-hex-key>`. The app can then decrypt old records.
+3. Take a backup. Re-encrypt stored records with the rotation script:
+   `npx tsx scripts/rotate-encryption-key.ts --apply` (run it without `--apply`
+   first for a dry run). The script uses the correct AAD for each field: wallet
+   view keys are bound to `view-key` + the **user id**, webhook secrets to
+   `webhook-secret` + the **endpoint id**.
+4. Verify the script reports zero records still referencing an old key id, then
+   test a full restore of both current and pre-rotation backups.
+
+**Never remove old keys from `WALLET_ENCRYPTION_PREVIOUS_KEYS` while any backup
+that used them may still be restored.** Removing a key makes every encrypted
+field in those backups permanently unreadable. Treat `PREVIOUS_KEYS` as an
+append-only key ring, and keep retired keys in your escrow procedure for as long
+as backups exist. Key ids must never be reused with different key material; the
+app rejects such a collision at startup.
+
+### Restoring an old backup
+
+Set the key set that was active when the backup was taken *before* loading the
+dump. For a pre-rotation backup:
+
+```
+WALLET_ENCRYPTION_KEY=<old-key>
+WALLET_ENCRYPTION_KEY_ID=env-1
+WALLET_ENCRYPTION_PREVIOUS_KEYS=   # keys older than the backup, if any
+```
+
+Restore, verify that wallet view keys and webhook secrets decrypt, then switch
+back to the current key set and re-run the rotation script. Legacy `v1` records
+need their original key in either the active slot or `PREVIOUS_KEYS`.
+
+Envelope encryption and AAD improve key management and ciphertext integrity.
+They do not protect against an attacker who obtains both the database and the
+encryption key, nor against an application host compromise. See the
+[threat model](../architecture/threat-model.md).

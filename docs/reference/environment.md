@@ -26,11 +26,24 @@ Every setting lives in `.env` at the repository root. Compose passes the relevan
 | `SINGLE_USER_EMAIL` | none | **yes** | The only accepted sign-in email. |
 | `SINGLE_USER_PASSWORD` | none | **yes** | At least 12 characters. |
 | `SESSION_SECRET` | none | **yes** | At least 32 characters; signs session cookies. |
-| `WALLET_ENCRYPTION_KEY` | none | **yes** | Exactly 64 hex characters (32 bytes) for AES-256-GCM. |
+| `WALLET_ENCRYPTION_KEY` | none | **yes** | Exactly 64 hex characters (32 bytes) for AES-256-GCM. Never falls back to a development key in production. |
+| `WALLET_ENCRYPTION_KEY_ID` | `env-1` | no | Identifier written into new ciphertext envelopes; change it when rotating keys. |
+| `WALLET_ENCRYPTION_PREVIOUS_KEYS` | none | no | Append-only, comma-separated `id:64-hex-key` ring for decrypting records written with retired keys and for restoring old backups. Never remove a key while any backup using it may be restored; never reuse an id with different material. |
 | `PAYMENT_API_KEY` | none | **yes** | At least 24 characters; bootstrap server key. |
 | `CRON_SECRET` | none | **yes** | At least 24 characters; protects cron endpoints. |
 | `CRON_INTERVAL_SECONDS` | `30` | no | Appliance-only. Seconds between settlement and webhook dispatch sweeps. Lower is faster but increases wallet RPC and database load. |
 | `BACKUP_PASSPHRASE` | none | for backups | Passphrase for the encryption scripts. |
+
+### Data retention
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `RETENTION_PAYMENT_REQUESTS_DAYS` | `365` | Closed payment requests older than this are purged by the retention cron. Open requests are never purged. |
+| `RETENTION_WEBHOOK_DELIVERIES_DAYS` | `30` | Old webhook delivery records. |
+| `RETENTION_RATE_LIMIT_BUCKETS_DAYS` | `1` | Old rate-limit buckets. |
+
+Set any category to `0` to disable purging it. Values are non-negative integers.
+The retention job is `POST /api/cron/retention`, protected by `CRON_SECRET`.
 
 Generate random values with `openssl rand -hex 32` or your password manager. Don't reuse a value across variables.
 
@@ -71,7 +84,7 @@ Generate random values with `openssl rand -hex 32` or your password manager. Don
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `TRUST_PROXY` | `0` | Set to `1` only when a trusted proxy **overwrites** `X-Forwarded-For`. |
+| `TRUST_PROXY` | `0` | Set to `1` only when a trusted proxy **overwrites** `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto`. The CSRF Origin check uses the latter two. |
 | `NEXT_TELEMETRY_DISABLED` | `1` | Baked into the image. Keep it set. |
 | `DO_NOT_TRACK` | `1` | Baked into the image. Keep it set. |
 | `ACCESS_MODE` | `clearnet` | Set by the Tor and I2P profiles; reported by health. |

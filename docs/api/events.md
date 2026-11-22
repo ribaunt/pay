@@ -19,7 +19,7 @@ curl -N -H 'x-api-key: $PAYMENT_API_KEY' http://localhost:3000/api/events
 Use the link ID and its status token — no API key needed:
 
 ```bash
-curl -N 'http://localhost:3000/api/events?linkId=<id>&token=<statusToken>'
+curl -N -H 'x-status-token: <statusToken>' 'http://localhost:3000/api/events?linkId=<id>'
 ```
 
 ## Event format
