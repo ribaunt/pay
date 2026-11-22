@@ -80,7 +80,7 @@ export async function GET() {
         mode: process.env.MONERO_DAEMON_MODE ?? "full-scan",
         proxy: process.env.MONERO_DAEMON_PROXY ? "socks5" : "none",
         viewKeySentToDaemon: false,
-        lightWallet: false,
+        lightWallet: (process.env.MONERO_DAEMON_MODE ?? "full-scan") !== "full-scan",
       },
       services: { db, walletRpc, daemon },
       sync: { walletHeight, daemonHeight, syncLag, status: syncStatus },

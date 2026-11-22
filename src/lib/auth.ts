@@ -32,9 +32,11 @@ export function verifyEnvCredentials(email: string, password: string): boolean {
 
   if (!expectedEmail || !expectedPassword) return false;
 
-  return (
-    safeEqual(email.trim().toLowerCase(), expectedEmail) && safeEqual(password, expectedPassword)
-  );
+  // Evaluate both comparisons to avoid a short-circuit timing oracle for the
+  // email. Bitwise AND keeps both calls executing.
+  const emailMatches = safeEqual(email.trim().toLowerCase(), expectedEmail) ? 1 : 0;
+  const passwordMatches = safeEqual(password, expectedPassword) ? 1 : 0;
+  return (emailMatches & passwordMatches) === 1;
 }
 
 /**

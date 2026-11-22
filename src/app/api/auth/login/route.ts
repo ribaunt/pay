@@ -20,6 +20,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { email?: string; password?: string };
     const email = body.email?.trim().toLowerCase();
 
+    if (email) {
+      await rateLimit(`login:account:${email}`, 20, 60_000);
+    }
+
     if (!email || !body.password) {
       return NextResponse.json({ error: "email and password are required" }, { status: 400 });
     }

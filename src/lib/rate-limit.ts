@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { inc } from "./metrics";
 
@@ -8,35 +9,42 @@ export class RateLimitError extends Error {
   }
 }
 
-/** Shared, Postgres-backed rate limiter. Works across app replicas and restarts. */
+/**
+ * Shared, Postgres-backed rate limiter that works across replicas.
+ *
+ * All counter updates are conditional single statements, so concurrent
+ * requests cannot interleave a read and a write to bypass the limit.
+ */
 export async function rateLimit(key: string, limit: number, windowMs: number): Promise<void> {
   const now = new Date();
   const resetAt = new Date(now.getTime() + windowMs);
-  const bucket = await prisma.rateLimitBucket.findUnique({ where: { key } });
 
-  if (!bucket || bucket.resetAt <= now) {
-    await prisma.rateLimitBucket.upsert({
-      where: { key },
-      create: { key, count: 1, resetAt },
-      update: { count: 1, resetAt },
-    });
+  // First request for this key: create the bucket atomically.
+  try {
+    await prisma.rateLimitBucket.create({ data: { key, count: 1, resetAt } });
     return;
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      throw error;
+    }
   }
 
-  if (bucket.count >= limit) {
-    inc("pay_rate_limit_hits_total", { route: key.split(":")[0] ?? "unknown" });
-    throw new RateLimitError();
-  }
-
-  await prisma.rateLimitBucket.update({
-    where: { key },
+  // Bucket exists: increment only while it is live and below the limit.
+  const incremented = await prisma.rateLimitBucket.updateMany({
+    where: { key, resetAt: { gt: now }, count: { lt: limit } },
     data: { count: { increment: 1 } },
   });
+  if (incremented.count > 0) return;
 
-  // Opportunistic cleanup of stale buckets.
-  if (Math.random() < 0.01) {
-    await prisma.rateLimitBucket.deleteMany({ where: { resetAt: { lt: now } } }).catch(() => {});
-  }
+  // Expired bucket: reset it atomically.
+  const reset = await prisma.rateLimitBucket.updateMany({
+    where: { key, resetAt: { lte: now } },
+    data: { count: 1, resetAt },
+  });
+  if (reset.count > 0) return;
+
+  inc("pay_rate_limit_hits_total", { route: key.split(":")[0] ?? "unknown" });
+  throw new RateLimitError();
 }
 
 /**

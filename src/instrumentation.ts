@@ -79,6 +79,10 @@ function instrumentProcess(): void {
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  // Validate secrets and force the full-scan daemon mode at startup, not on
+  // first request, so a misconfigured production deployment fails fast.
+  const { assertProductionEnv } = await import("@/lib/env");
+  assertProductionEnv();
   instrumentHttp();
   instrumentProcess();
 }
