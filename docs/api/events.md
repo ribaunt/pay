@@ -1,3 +1,7 @@
+---
+icon: lucide/zap
+---
+
 # Events (SSE)
 
 `GET /api/events` streams payment-link updates as Server-Sent Events. It polls the database every second and emits only on real state changes.

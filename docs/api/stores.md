@@ -1,3 +1,7 @@
+---
+icon: lucide/layers
+---
+
 # Stores
 
 A store is an isolated payment channel backed by its own Monero **account** (major index). Accounts in the same wallet are unlinkable on-chain, so two stores cannot be correlated from blockchain data.

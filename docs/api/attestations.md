@@ -1,3 +1,7 @@
+---
+icon: lucide/stamp
+---
+
 # Revenue attestations
 
 `GET /api/admin/attestations` returns a **signed aggregate** of confirmed payments in a period. It contains no link IDs, addresses, transaction hashes, or customer data.
