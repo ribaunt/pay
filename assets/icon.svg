@@ -1,4 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#dc2626"/>
-  <text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#ffffff">P</text>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="256" height="256" rx="60" fill="black"/>
+<path d="M163.507 106.657H123.985L109.277 70H188.292L203 106.657L183.242 155.888H143.743L163.507 106.657Z" fill-rule="evenodd" clip-rule="evenodd" fill="white"/>
+<path d="M123.986 106.656L155.473 185.111H115.974L104.239 155.86L92.4989 185.111H53L84.4872 106.656H123.986Z" fill-rule="evenodd" clip-rule="evenodd" fill="white"/>
 </svg>
