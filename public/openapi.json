@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Ribaunt Pay API",
-    "version": "0.8.4",
+    "version": "0.8.5",
     "description": "API-first, watch-only Monero payment server. All amounts use XMR/atomic pairs and every timestamp is an ISO string or null."
   },
   "servers": [{ "url": "http://localhost:3000" }],
