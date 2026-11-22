@@ -117,8 +117,13 @@ jobs:
           curl -fsS --max-time 30 -c /tmp/pay-cookie -X POST http://localhost:3000/api/auth/login \
             -H 'content-type: application/json' \
             -d '{"email":"ci@example.com","password":"ci-password-at-least-12"}'
+          curl -fsS --max-time 30 -b /tmp/pay-cookie -c /tmp/pay-cookie \
+            http://localhost:3000/api/auth/csrf > /tmp/pay-csrf.json
+          CSRF_TOKEN=$(python3 -c 'import json; print(json.load(open("/tmp/pay-csrf.json"))["token"])')
           curl -fsS --max-time 90 -b /tmp/pay-cookie -X POST http://localhost:3000/api/wallet/setup \
             -H 'content-type: application/json' \
+            -H 'origin: http://localhost:3000' \
+            -H "x-csrf-token: $CSRF_TOKEN" \
             -d '{"address":"55LUf1D3VW2bTJ58jQK2bTYCV15pSGozMbTGscJrVfS5aW1AXQAvmbtJBHd7HzS8eSBSt4vJTsZ799g4GtSdDfFZGh9KCBd","viewKey":"90c6b30bb49fd5305cd6ff0e27a132a18fe79e9a20a6841e7558126ab476f80c"}'
       - name: Run integration smoke test
         run: npm run test:integration

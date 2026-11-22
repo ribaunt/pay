@@ -27,6 +27,15 @@ async function main() {
   assert(login.ok, "env credentials sign in");
   const cookie = login.headers.get("set-cookie")?.split(";")[0] ?? "";
 
+  const csrfResponse = await fetch(`${APP}/api/auth/csrf`, { headers: { cookie } });
+  assert(csrfResponse.ok, "CSRF token is issued for the session");
+  const csrfCookie = csrfResponse.headers
+    .getSetCookie()
+    .find((value) => value.startsWith("pay_csrf="))
+    ?.split(";")[0] ?? "";
+  const { token: csrfToken } = (await csrfResponse.json()) as { token: string };
+  const cookieWithCsrf = [cookie, csrfCookie].filter(Boolean).join("; ");
+
   const me = await fetch(`${APP}/api/auth/me`, { headers: { cookie } }).then((r) => r.json());
   assert(me.user?.email === process.env.SINGLE_USER_EMAIL, "session resolves to the single user");
 
@@ -49,7 +58,7 @@ async function main() {
 
   const cancelled = await fetch(`${APP}/api/payment-links/${link.id}/cancel`, {
     method: "POST",
-    headers: { cookie },
+    headers: { cookie: cookieWithCsrf, origin: APP, "x-csrf-token": csrfToken },
   });
   assert(cancelled.status === 200, "waiting link can be cancelled");
 
