@@ -85,6 +85,7 @@ Generate random values with `openssl rand -hex 32` or your password manager. Don
 | Variable | Default | Description |
 | --- | --- | --- |
 | `TRUST_PROXY` | `0` | Set to `1` only when a trusted proxy **overwrites** `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto`. The CSRF Origin check uses the latter two. |
+| `HSTS_HEADER` | `1` | Set to `0` if your reverse proxy already emits `Strict-Transport-Security`, to avoid duplicate policies. |
 | `NEXT_TELEMETRY_DISABLED` | `1` | Baked into the image. Keep it set. |
 | `DO_NOT_TRACK` | `1` | Baked into the image. Keep it set. |
 | `ACCESS_MODE` | `clearnet` | Set by the Tor and I2P profiles; reported by health. |

@@ -66,7 +66,19 @@ curl -X POST https://pay.example.com/api/cron/payment-links \
   -H "x-cron-secret: $CRON_SECRET"
 ```
 
-A missing or wrong value returns `401`. These endpoints never accept an API key.
+A missing or wrong value returns `401`. These endpoints never accept an API key. The protected jobs are:
+
+- `POST /api/cron/payment-links` — settlement.
+- `POST /api/cron/webhooks` — webhook dispatch.
+- `POST /api/cron/wallet-store` — wallet file backup.
+- `POST /api/cron/retention` — per-category data retention purge.
+
+## Browser sessions and CSRF
+
+Session-authenticated state changes (`POST`, `PUT`, `PATCH`, `DELETE`) require a
+same-origin `Origin` header and a CSRF token from `GET /api/auth/csrf`, sent as
+`x-csrf-token`. Missing or invalid values return `403`. API-key requests are
+exempt because they do not use browser cookies.
 
 ## Status tokens
 

@@ -37,6 +37,13 @@ Response `201`:
 
 The secret is shown once. It's encrypted in PostgreSQL and never returned again.
 
+Webhook delivery performs outbound SSRF protection on every attempt: all A and
+AAAA records are resolved and validated, a mixed public/private DNS response is
+rejected, and the connection is pinned to the validated IP while the original
+hostname is preserved for TLS verification. Redirects are disabled, and the
+delivery has timeout, response-size and connection limits. Literal IP targets
+are rejected because pinning cannot be enforced on that path.
+
 | Error | Reason |
 | --- | --- |
 | `400` | Missing URL, non-HTTPS in production, credentials in URL, private address, or a hostname that resolves to a private address. |
