@@ -190,7 +190,7 @@ describe("setupWatchOnlyWallet", () => {
     });
 
     const storedViewKey = (upsert.create as { viewKey: string }).viewKey;
-    expect(storedViewKey).toMatch(/^v1\./);
+    expect(storedViewKey).toMatch(/^v2\./);
     expect(storedViewKey).not.toContain(VIEW_KEY);
   });
 });

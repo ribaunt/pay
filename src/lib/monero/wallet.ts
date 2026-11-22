@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { prisma } from "@/lib/prisma";
 import { SINGLE_USER_ID } from "@/lib/auth";
 import { getMoneroNetwork } from "./network";
-import { encryptSecret } from "@/lib/crypto";
+import { encryptSecret, VIEW_KEY_PURPOSE } from "@/lib/crypto";
 import {
   requireMoneroAddress,
   requireViewKey,
@@ -208,7 +208,7 @@ export async function setupWatchOnlyWallet(
   }
   openWalletFile = walletFile;
 
-  const encryptedViewKey = encryptSecret(viewKey);
+  const encryptedViewKey = encryptSecret(viewKey, VIEW_KEY_PURPOSE, userId);
 
   await prisma.wallet.upsert({
     where: { userId },
