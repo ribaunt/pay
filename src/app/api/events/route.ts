@@ -41,7 +41,9 @@ function same(a: Snapshot | undefined, b: Snapshot): boolean {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const linkId = url.searchParams.get("linkId");
-  const token = url.searchParams.get("token");
+  // Bearer token travels in a header so it never lands in URLs, proxy logs,
+  // browser history or Referer headers.
+  const token = request.headers.get("x-status-token");
 
   if (linkId && token) {
     const status = await getPaymentLinkStatus(linkId, token);
