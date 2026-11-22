@@ -1,9 +1,9 @@
-import { createHmac, randomBytes } from "node:crypto";
-import { isIP } from "node:net";
-import { lookup } from "node:dns/promises";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { inc } from "@/lib/metrics";
-import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { decryptSecret, encryptSecret, WEBHOOK_SECRET_PURPOSE } from "@/lib/crypto";
+import { assertPublicUrl, postPinned, resolvePublicAddress } from "@/lib/ssrf";
+import { redact } from "@/lib/redact";
 
 export const WEBHOOK_EVENTS = [
   "payment.created",
@@ -18,69 +18,10 @@ export const WEBHOOK_EVENTS = [
   "payment.renewed",
 ] as const;
 
-function isPrivateIp(address: string): boolean {
-  let ip = address.toLowerCase();
-  if (ip.startsWith("::ffff:")) ip = ip.slice(7);
-
-  if (ip.includes(".")) {
-    const octets = ip.split(".").map(Number);
-    if (octets.length !== 4 || octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
-      return true;
-    }
-    const [a, b] = octets;
-    return (
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      a === 169 && b === 254 ||
-      a === 172 && b >= 16 && b <= 31 ||
-      a === 192 && b === 168 ||
-      a === 100 && b >= 64 && b <= 127 ||
-      a === 192 && b === 0 ||
-      a === 198 && (b === 18 || b === 19)
-    );
-  }
-
-  return (
-    ip === "::1" ||
-    ip === "::" ||
-    ip.startsWith("fc") ||
-    ip.startsWith("fd") ||
-    ip.startsWith("fe80")
-  );
-}
-
-function assertPublicUrl(raw: string): URL {
-  const url = new URL(raw);
-
-  if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
-    throw new Error("Webhook URL must use https in production");
-  }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("Invalid webhook URL");
-  }
-  if (url.username || url.password) {
-    throw new Error("Webhook URL must not contain credentials");
-  }
-
-  const host = url.hostname.toLowerCase();
-  if (isIP(host) ? isPrivateIp(host) : host === "localhost" || host.endsWith(".local") || host.endsWith(".internal")) {
-    throw new Error("Webhook URL must not target a private address");
-  }
-
-  return url;
-}
-
-async function assertPublicUrlResolved(url: URL): Promise<void> {
-  const records = await lookup(url.hostname, { all: true });
-  if (records.length === 0) throw new Error("Webhook host did not resolve");
-  if (records.some((record) => isPrivateIp(record.address))) {
-    throw new Error("Webhook URL must not target a private address");
-  }
-}
-
-function loadWebhookSecret(value: string): string {
-  return value.startsWith("v1.") ? decryptSecret(value) : value;
+function loadWebhookSecret(value: string, endpointId: string): string {
+  return value.startsWith("v1.") || value.startsWith("v2.")
+    ? decryptSecret(value, WEBHOOK_SECRET_PURPOSE, endpointId)
+    : value;
 }
 
 export async function registerWebhook(options: {
@@ -89,17 +30,19 @@ export async function registerWebhook(options: {
   apiKeyId?: string | null;
   storeId?: string | null;
 }) {
-  const url = assertPublicUrl(options.url);
-  await assertPublicUrlResolved(url);
+  const target = assertPublicUrl(options.url);
+  await resolvePublicAddress(target.hostname);
 
   const events = options.events?.trim() || "*";
   const secret = `whsec_${randomBytes(24).toString("base64url")}`;
+  const endpointId = randomUUID();
 
   const endpoint = await prisma.webhookEndpoint.create({
     data: {
-      url: url.toString(),
+      id: endpointId,
+      url: target.url.toString(),
       events,
-      secret: encryptSecret(secret),
+      secret: encryptSecret(secret, WEBHOOK_SECRET_PURPOSE, endpointId),
       apiKeyId: options.apiKeyId ?? null,
       storeId: options.storeId ?? null,
     },
@@ -168,25 +111,26 @@ export async function dispatchWebhooks() {
     }
 
     try {
-      await assertPublicUrlResolved(new URL(endpoint.url));
-
-      const response = await fetch(endpoint.url, {
-        method: "POST",
-        redirect: "manual",
-        headers: {
+      // Revalidate and pin on every delivery: validating at registration is not
+      // enough because DNS can change between validation and connection.
+      const target = assertPublicUrl(endpoint.url);
+      const pinned = await resolvePublicAddress(target.hostname);
+      const response = await postPinned(
+        target,
+        pinned,
+        {
           "content-type": "application/json",
           "x-pay-event": delivery.event,
           "x-pay-delivery-id": delivery.id,
           "x-pay-signature": signature(
-            loadWebhookSecret(endpoint.secret),
+            loadWebhookSecret(endpoint.secret, endpoint.id),
             delivery.id,
             delivery.event,
             delivery.payload
           ),
         },
-        body: delivery.payload,
-        signal: AbortSignal.timeout(5000),
-      });
+        delivery.payload
+      );
 
       const attempts = delivery.attempts + 1;
       if (response.ok) {
@@ -224,7 +168,7 @@ export async function dispatchWebhooks() {
         where: { id: delivery.id },
         data: {
           attempts,
-          error: error instanceof Error ? error.message : String(error),
+          error: redact(error instanceof Error ? error.message : String(error)),
           nextRetryAt: attempts >= 6 ? null : new Date(Date.now() + 2 ** attempts * 1000),
           status: attempts >= 6 ? "dead" : "pending",
         },

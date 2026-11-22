@@ -1,4 +1,5 @@
 const { createHmac } = await import("node:crypto");
+const { EventEmitter } = await import("node:events");
 const { beforeEach, describe, expect, it, vi } = await import("@/testkit");
 
 await vi.mock("@/lib/prisma", () => ({
@@ -20,8 +21,28 @@ await vi.mock("node:dns/promises", () => ({
   lookup: vi.fn().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]),
 }));
 
+await vi.mock("node:https", () => {
+  const request = vi.fn((_options: unknown, callback: (res: InstanceType<typeof EventEmitter> & { statusCode: number }) => void) => {
+    const res = Object.assign(new EventEmitter(), { statusCode: 200 });
+    queueMicrotask(() => {
+      res.emit("data", Buffer.from("ok"));
+      res.emit("end");
+    });
+    callback(res);
+    const req = Object.assign(new EventEmitter(), {
+      write: vi.fn(),
+      end: vi.fn(),
+      destroy: vi.fn(),
+    });
+    return req;
+  });
+  return { request, Agent: class {} };
+});
+
 const { prisma } = await import("@/lib/prisma");
-const { encryptSecret } = await import("@/lib/crypto");
+const { encryptSecret, WEBHOOK_SECRET_PURPOSE } = await import("@/lib/crypto");
+const { isPrivateIp, assertPublicUrl, resolvePublicAddress } = await import("@/lib/ssrf");
+const { request: httpsRequest } = await import("node:https");
 const { dispatchWebhooks, emitWebhook, registerWebhook } = await import("./webhooks");
 
 beforeEach(() => {
@@ -39,21 +60,63 @@ beforeEach(() => {
   vi.mocked(prisma.webhookDelivery.createMany).mockResolvedValue({ count: 1 });
   vi.mocked(prisma.webhookDelivery.findMany).mockResolvedValue([]);
   vi.mocked(prisma.webhookDelivery.update).mockResolvedValue({} as never);
+  vi.mocked(httpsRequest).mockImplementation((_options: unknown, callback: (res: InstanceType<typeof EventEmitter> & { statusCode: number }) => void) => {
+    const res = Object.assign(new EventEmitter(), { statusCode: 200 });
+    queueMicrotask(() => {
+      res.emit("data", Buffer.from("ok"));
+      res.emit("end");
+    });
+    callback(res as never);
+    return Object.assign(new EventEmitter(), { write: vi.fn(), end: vi.fn(), destroy: vi.fn() }) as never;
+  });
+});
+
+describe("SSRF helpers", () => {
+  it("rejects private, mapped, unique-local and documentation addresses", () => {
+    for (const address of [
+      "127.0.0.1",
+      "10.0.0.5",
+      "169.254.169.254",
+      "::ffff:127.0.0.1",
+      "fc00::1",
+      "fd12::1",
+      "fe80::1",
+      "2001:db8::1",
+      "::1",
+    ]) {
+      expect(isPrivateIp(address)).toBe(true);
+    }
+    expect(isPrivateIp("93.184.216.34")).toBe(false);
+  });
+
+  it("rejects numeric and local hostnames at URL validation", () => {
+    expect(() => assertPublicUrl("https://127.0.0.1/hook")).toThrow("private address");
+    expect(() => assertPublicUrl("https://2130706433/hook")).toThrow("private address");
+    expect(() => assertPublicUrl("https://0x7f000001/hook")).toThrow("private address");
+    expect(() => assertPublicUrl("https://localhost/hook")).toThrow("private address");
+    expect(() => assertPublicUrl("https://user:pass@example.com/hook")).toThrow("credentials");
+  });
+
+  it("rejects mixed public/private DNS responses", async () => {
+    const { lookup } = await import("node:dns/promises");
+    vi.mocked(lookup).mockResolvedValueOnce([
+      { address: "93.184.216.34", family: 4 },
+      { address: "10.0.0.5", family: 4 },
+    ] as never);
+    await expect(resolvePublicAddress("example.com")).rejects.toThrow("private address");
+  });
 });
 
 describe("registerWebhook", () => {
-  it("returns a one-time secret and stores it encrypted", async () => {
+  it("returns a one-time secret and stores it encrypted with AAD", async () => {
     const result = await registerWebhook({ url: "https://example.com/hook" });
     expect(result.secret).toMatch(/^whsec_/);
 
-    const create = vi.mocked(prisma.webhookEndpoint.create).mock.calls[0][0];
-    expect((create.data as { secret: string }).secret).toMatch(/^v1\./);
-  });
-
-  it("rejects private literal addresses", async () => {
-    await expect(registerWebhook({ url: "https://127.0.0.1/hook" })).rejects.toThrow(
-      "private address"
-    );
+    const create = vi.mocked(prisma.webhookEndpoint.create).mock.calls[0][0] as {
+      data: { id: string; secret: string };
+    };
+    expect(create.data.secret).toMatch(/^v2\./);
+    expect(create.data.id).toBeTruthy();
   });
 
   it("rejects private DNS results", async () => {
@@ -78,32 +141,48 @@ describe("emitWebhook", () => {
 });
 
 describe("dispatchWebhooks", () => {
-  it("signs deliveries with the decrypted secret and disables redirects", async () => {
+  it("pins the connection to the validated IP and preserves TLS hostname", async () => {
     const secret = "whsec_test";
+    const endpointId = "endpoint-1";
     const payload = JSON.stringify({ event: "payment.confirmed" });
 
     vi.mocked(prisma.webhookDelivery.findMany).mockResolvedValue([
-      { id: "delivery-1", endpointId: "e1", event: "payment.confirmed", payload, attempts: 0 },
+      { id: "delivery-1", endpointId, event: "payment.confirmed", payload, attempts: 0 },
     ] as never);
     vi.mocked(prisma.webhookEndpoint.findUnique).mockResolvedValue({
-      id: "e1",
+      id: endpointId,
       url: "https://example.com/hook",
-      secret: encryptSecret(secret),
+      secret: encryptSecret(secret, WEBHOOK_SECRET_PURPOSE, endpointId),
       enabled: true,
     } as never);
 
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
-    vi.stubGlobal("fetch", fetchMock);
-
     const result = await dispatchWebhooks();
-
     expect(result).toEqual({ sent: 1, failed: 0 });
-    const init = fetchMock.mock.calls[0][1] as { headers: Record<string, string>; redirect?: string };
-    expect(init.redirect).toBe("manual");
-    const expected = `sha256=${createHmac("sha256", secret)
-      .update(`delivery-1.payment.confirmed.${payload}`)
-      .digest("hex")}`;
-    expect(init.headers["x-pay-signature"]).toBe(expected);
+
+    const options = vi.mocked(httpsRequest).mock.calls[0][0] as {
+      hostname: string;
+      servername: string;
+      headers: Record<string, string>;
+      lookup: (host: string, opts: unknown, cb: (err: Error | null, address: string, family: number) => void) => void;
+    };
+    expect(options.hostname).toBe("example.com");
+    expect(options.servername).toBe("example.com");
+    expect(options.headers.host).toBe("example.com");
+
+    const pinned = await new Promise<{ address: string; family: number }>((resolve) => {
+      options.lookup("example.com", {}, (err, address, family) => {
+        expect(err).toBeNull();
+        resolve({ address, family });
+      });
+    });
+    expect(pinned).toEqual({ address: "93.184.216.34", family: 4 });
+
+    const signatureHeader = options.headers["x-pay-signature"];
+    expect(signatureHeader).toBe(
+      `sha256=${createHmac("sha256", secret)
+        .update(`delivery-1.payment.confirmed.${payload}`)
+        .digest("hex")}`
+    );
   });
 });
 
