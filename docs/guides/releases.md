@@ -61,11 +61,11 @@ docker run -d --name pay --restart unless-stopped \
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`:
 
-1. Validate: tests, lint, build, audit, docs.
+1. Validate: tests, both SDK test suites, lint, build, audit, docs.
 2. Build and push all three images for both architectures.
 3. Sign images and SBOMs with keyless cosign.
 4. Attest build provenance.
-5. Create a GitHub Release with notes, assets, and digests.
+5. Create a GitHub Release with notes, assets, and digests. Curated highlights and upgrade notes come from `release/NOTES.md` in the repository.
 
 The workflow can also be started manually with a `version` input.
 

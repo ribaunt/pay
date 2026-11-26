@@ -208,6 +208,11 @@ jobs:
             echo "All images are signed with cosign and include SPDX SBOMs and build provenance."
           } > release-notes.md
 
+      - name: Append curated release notes
+        run: |
+          printf '\n' >> release-notes.md
+          cat release/NOTES.md >> release-notes.md
+
       - name: Build checksums
         run: |
           find artifacts -type f \( -name '*.spdx.json' -o -name '*.bundle' -o -name '*.digest.txt' \) -print | sort > /tmp/asset-files
