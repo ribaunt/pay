@@ -20,7 +20,7 @@ Internal errors are intentionally vague: `Internal server error` for unexpected 
 | --- | --- | --- |
 | `400` | Bad request | Invalid amount, address, currency, message, label, restore height, timeout, or confirmation count; malformed JSON. |
 | `401` | Unauthorized | Missing or invalid session, API key, cron secret, or webhook scope. |
-| `404` | Not found | Unknown payment link ID or wrong status token. |
+| `404` | Not found | Unknown payment link ID, wrong status token, or a store-scoped key accessing another store's link. |
 | `409` | Conflict | Idempotency key reused with a different body; cancelling a link with a transaction; renewing a non-expired link. |
 | `429` | Too many requests | Per-route rate limit exceeded. |
 | `502` | Bad gateway | `monero-wallet-rpc` unreachable or returned an error. |

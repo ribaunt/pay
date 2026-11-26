@@ -149,13 +149,13 @@ curl https://pay.example.com/api/payment-links/clh1234567890/status \
 { "id": "clh1234567890", "status": "cancelled" }
 ```
 
-Only a `pending` link with no `txHash` and no `paidAt` can be cancelled. Otherwise the response is `409`.
+Only a `pending` link with no `txHash` and no `paidAt` can be cancelled. Otherwise the response is `409`. A store-scoped API key gets `404` for another store's link.
 
 ## Renew
 
 `POST /api/payment-links/{id}/renew` accepts an API key with `payment:write` or a session. It returns `201` with the same shape as create, wrapped in `{ "link": ... }`.
 
-Renewal requires an `expired` link with no transaction. It creates a new subaddress, a new token, a default-length expiry, and a fresh fiat quote when applicable. A link can be renewed only once; `409` covers all other states, including a repeat or concurrent renewal.
+Renewal requires an `expired` link with no transaction. It creates a new subaddress, a new token, a default-length expiry, and a fresh fiat quote when applicable. A link can be renewed only once; `409` covers all other states, including a repeat or concurrent renewal. A store-scoped API key gets `404` for another store's link.
 
 ## Settlement cron
 
