@@ -165,6 +165,10 @@ Authenticated:
 
 Monero amounts are strings/bigint in piconero (1 XMR = 1e12 piconero). Migrations run on startup.
 
+## Client libraries
+
+Dependency-free [TypeScript and Python clients](sdk/README.md) cover payment links, webhooks, proofs, prices, SSE streams with header tokens, idempotency keys, retries and offline signature verification. The full HTTP contract is served at `/openapi.json`.
+
 ## Releases
 
 Signed, multi-arch images are published as `ghcr.io/ribaunt/pay`, `ghcr.io/ribaunt/pay-app`, and `ghcr.io/ribaunt/pay-wallet-rpc`. Pushing a `v*` tag runs `.github/workflows/release.yml`, which validates, builds, signs, attests, and creates a GitHub Release. The all-in-one appliance can be installed with `release/install.sh`.
@@ -181,7 +185,9 @@ Backups use AES-256-CBC with PBKDF2 and are created with `umask 077`. Keep `.env
 ## Tests
 
 ```bash
-npm test          # 112 tests, Node 24+ required for module mocks
+npm test          # unit tests, Node 24+ required for module mocks
+npm run test:sdk  # TypeScript SDK tests
+python3 -m unittest discover -s sdk/python   # Python SDK tests
 npm run test:watch
 npm run test:integration   # against a running stack
 ```
