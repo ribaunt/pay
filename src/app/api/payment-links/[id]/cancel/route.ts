@@ -24,7 +24,7 @@ export async function POST(
     await rateLimit(`payment-cancel:${key ? `key:${key.id}` : clientId(request)}`, 30, 60_000);
 
     const { id } = await params;
-    return NextResponse.json(await cancelPaymentLink(id));
+    return NextResponse.json(await cancelPaymentLink(id, key?.storeId));
   } catch (error) {
     return apiError(error, "Failed to cancel payment");
   }

@@ -1,5 +1,5 @@
 const { describe, expect, it } = await import("@/testkit");
-const { apiError } = await import("./api-response");
+const { apiError, NotFoundError } = await import("./api-response");
 const { MoneroRpcError } = await import("./monero/rpc");
 
 describe("apiError", () => {
@@ -18,6 +18,11 @@ describe("apiError", () => {
     const response = apiError(new Error("Invalid XMR amount"));
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe("Invalid XMR amount");
+  });
+
+  it("maps scoped misses to 404", async () => {
+    const response = apiError(new NotFoundError("Payment not found"));
+    expect(response.status).toBe(404);
   });
 });
 

@@ -10,11 +10,19 @@ export class ConflictError extends Error {
   }
 }
 
+export class NotFoundError extends Error {
+  constructor(message = "Not found") {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
 export function apiError(error: unknown, fallback = "Request failed") {
   const message = error instanceof Error ? error.message : fallback;
 
   let status = 500;
   if (error instanceof AuthError) status = 401;
+  else if (error instanceof NotFoundError) status = 404;
   else if (error instanceof ConflictError) status = 409;
   else if (error instanceof RateLimitError) status = 429;
   else if (error instanceof MoneroRpcError) status = 502;

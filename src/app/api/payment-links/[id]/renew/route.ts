@@ -23,7 +23,7 @@ export async function POST(
     await rateLimit(`payment-renew:${key ? `key:${key.id}` : clientId(request)}`, 30, 60_000);
 
     const { id } = await params;
-    return NextResponse.json({ link: await renewPaymentLink(id) }, { status: 201 });
+    return NextResponse.json({ link: await renewPaymentLink(id, key?.storeId) }, { status: 201 });
   } catch (error) {
     return apiError(error, "Failed to renew payment");
   }

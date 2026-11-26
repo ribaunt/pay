@@ -14,6 +14,7 @@ await vi.mock("@/lib/prisma", () => ({
       updateMany: vi.fn(),
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
     paymentRequestTransfer: {
       upsert: vi.fn(),
@@ -37,7 +38,7 @@ const { prisma } = await import("@/lib/prisma");
 const { createPaymentRequestAtomic, getTransfersSince, getWalletHeight } = await import("@/lib/monero/wallet");
 const { emitWebhook } = await import("./webhooks");
 const { cancelPaymentLink, renewPaymentLink, settlePaymentLinks } = await import("./links");
-const { ConflictError } = await import("@/lib/api-response");
+const { ConflictError, NotFoundError } = await import("@/lib/api-response");
 
 const now = new Date();
 
@@ -332,6 +333,27 @@ describe("cancelPaymentLink", () => {
 
     await expect(cancelPaymentLink("cancel-2")).rejects.toThrow(ConflictError);
   });
+
+  it("scopes cancellation to the caller's store", async () => {
+    vi.mocked(prisma.paymentRequest.findFirst).mockResolvedValue({ id: "cancel-1" } as never);
+
+    await cancelPaymentLink("cancel-1", "store-a");
+
+    expect(prisma.paymentRequest.findFirst).toHaveBeenCalledWith({
+      where: { id: "cancel-1", storeId: "store-a" },
+      select: { id: true },
+    });
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ storeId: "store-a" }) })
+    );
+  });
+
+  it("hides another store's link from cancellation", async () => {
+    vi.mocked(prisma.paymentRequest.findFirst).mockResolvedValue(null);
+
+    await expect(cancelPaymentLink("cancel-1", "store-a")).rejects.toThrow(NotFoundError);
+    expect(prisma.paymentRequest.updateMany).not.toHaveBeenCalled();
+  });
 });
 
 describe("partial payments", () => {
@@ -382,7 +404,7 @@ describe("partial payments", () => {
 
 describe("renewPaymentLink", () => {
   it("renews an expired payment with no transaction", async () => {
-    vi.mocked(prisma.paymentRequest.findUnique).mockResolvedValue({
+    vi.mocked(prisma.paymentRequest.findFirst).mockResolvedValue({
       id: "expired-link",
       status: "expired",
       txHash: null,
@@ -434,13 +456,23 @@ describe("renewPaymentLink", () => {
   });
 
   it("refuses to renew a paid payment", async () => {
-    vi.mocked(prisma.paymentRequest.findUnique).mockResolvedValue({
+    vi.mocked(prisma.paymentRequest.findFirst).mockResolvedValue({
       id: "paid-link",
       status: "confirmed",
       txHash: "tx-1",
     } as never);
 
     await expect(renewPaymentLink("paid-link")).rejects.toThrow(ConflictError);
+  });
+
+  it("hides another store's link from renewal", async () => {
+    vi.mocked(prisma.paymentRequest.findFirst).mockResolvedValue(null);
+
+    await expect(renewPaymentLink("expired-link", "store-a")).rejects.toThrow(NotFoundError);
+    expect(prisma.paymentRequest.findFirst).toHaveBeenCalledWith({
+      where: { id: "expired-link", storeId: "store-a" },
+    });
+    expect(prisma.paymentRequest.create).not.toHaveBeenCalled();
   });
 });
 

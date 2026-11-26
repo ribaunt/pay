@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { ConflictError } from "@/lib/api-response";
+import { ConflictError, NotFoundError } from "@/lib/api-response";
 import { getPaymentConfig } from "@/lib/config";
 import { inc, observe } from "@/lib/metrics";
 import { SINGLE_USER_ID } from "@/lib/auth";
@@ -249,10 +249,19 @@ export async function getPaymentLinkStatus(id: string, token: string | null) {
 }
 
 /** Cancel only a waiting request with no observed transaction. */
-export async function cancelPaymentLink(id: string) {
+export async function cancelPaymentLink(id: string, storeId?: string | null) {
+  if (storeId) {
+    const own = await prisma.paymentRequest.findFirst({
+      where: { id, storeId },
+      select: { id: true },
+    });
+    if (!own) throw new NotFoundError("Payment not found");
+  }
+
   const result = await prisma.paymentRequest.updateMany({
     where: {
       id,
+      ...(storeId ? { storeId } : {}),
       status: "pending",
       txHash: null,
       paidAt: null,
@@ -277,9 +286,14 @@ export async function cancelPaymentLink(id: string) {
   return paymentLinkView(cancelled);
 }
 
-export async function renewPaymentLink(id: string) {
-  const previous = await prisma.paymentRequest.findUnique({ where: { id } });
-  if (!previous) throw new ConflictError("Payment not found");
+export async function renewPaymentLink(id: string, storeId?: string | null) {
+  const previous = await prisma.paymentRequest.findFirst({
+    where: { id, ...(storeId ? { storeId } : {}) },
+  });
+  if (!previous) {
+    if (storeId) throw new NotFoundError("Payment not found");
+    throw new ConflictError("Payment not found");
+  }
   if (previous.status !== "expired") {
     throw new ConflictError("Only expired payments can be renewed");
   }
