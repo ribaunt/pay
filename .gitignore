@@ -10,3 +10,5 @@ backups
 site
 .venv
 monitoring
+__pycache__/
+*.pyc
