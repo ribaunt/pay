@@ -32,6 +32,10 @@ printf 'rpc-login=%s:%s\n' "$MONERO_RPC_USER" "$MONERO_RPC_PASSWORD" > "$CONFIG_
 
 mkdir -p /data/wallets
 
+# The monero user created with adduser --system has HOME=/nonexistent, which
+# makes the wallet RPC fail to open its ring database.
+export HOME=/data/wallets
+
 echo "Starting monero-wallet-rpc in $NETWORK mode, daemon: $DAEMON, proxy: ${MONERO_DAEMON_PROXY:-none}"
 
 exec monero-wallet-rpc \
