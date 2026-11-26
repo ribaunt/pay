@@ -10,17 +10,19 @@ Register endpoints, inspect them, and drive delivery. The [webhook guide](../gui
 
 `POST /api/webhooks` accepts an API key with `webhook:write` or a session. It allows 10 calls per minute.
 
+The bootstrap `PAYMENT_API_KEY` only has payment scopes and returns `401` here. Create a dedicated key with `webhook:write,webhook:read` as described in [API keys](../guides/api-keys.md), then use that key below.
+
 ```bash
 curl -X POST https://pay.example.com/api/webhooks \
   -H 'content-type: application/json' \
-  -H "x-api-key: $PAYMENT_API_KEY" \
+  -H "x-api-key: $WEBHOOK_API_KEY" \
   -d '{ "url": "https://app.example.com/hooks/pay", "events": "*" }'
 ```
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `url` | string | Required. HTTPS in production, public host, no credentials or redirects. |
-| `events` | string | Optional comma-separated event names. Defaults to `*`. |
+| `events` | string | Optional comma-separated event names. Whitespace around names is ignored; unknown names return `400`. Defaults to `*`. |
 
 Response `201`:
 
@@ -46,7 +48,7 @@ are rejected because pinning cannot be enforced on that path.
 
 | Error | Reason |
 | --- | --- |
-| `400` | Missing URL, non-HTTPS in production, credentials in URL, private address, or a hostname that resolves to a private address. |
+| `400` | Missing URL, non-HTTPS in production, credentials in URL, private address, a hostname that resolves to a private address, or an unknown event name in `events`. |
 | `401` | Unauthorized. |
 
 ## List endpoints

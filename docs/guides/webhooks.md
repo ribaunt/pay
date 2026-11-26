@@ -8,13 +8,15 @@ Webhooks let your application react to payment events instead of polling. Events
 
 ## Register an endpoint
 
+Use a key with the `webhook:write` scope ([API keys](api-keys.md)), not the bootstrap `PAYMENT_API_KEY`, which only has payment scopes and returns `401`.
+
 ```bash
 curl -X POST https://pay.example.com/api/webhooks \
   -H 'content-type: application/json' \
-  -H "x-api-key: $PAYMENT_API_KEY" \
+  -H "x-api-key: $WEBHOOK_API_KEY" \
   -d '{
     "url": "https://app.example.com/hooks/pay",
-    "events": "payment.confirmed,payment.underpaid"
+    "events": "payment.confirmed, payment.underpaid"
   }'
 ```
 
@@ -29,7 +31,7 @@ curl -X POST https://pay.example.com/api/webhooks \
 }
 ```
 
-Copy the secret now: it's shown only once and stored encrypted at rest. Omit `events` to receive everything (`*`).
+Copy the secret now: it's shown only once and stored encrypted at rest. Omit `events` to receive everything (`*`). Whitespace around event names is ignored; unknown names are rejected with `400`.
 
 ### URL rules
 

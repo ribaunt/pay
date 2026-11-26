@@ -16,7 +16,7 @@ curl https://pay.example.com/api/payment-links \
 ```
 
 !!! tip "Create a real key for each integration"
-    The env key is meant for bootstrapping. Issue separate keys for each service so you can revoke one without taking down the others.
+    The env key is meant for bootstrapping. Issue separate keys for each service so you can revoke one without taking down the others. It has only payment scopes, so webhook registration needs a key with `webhook:write`.
 
 ## Create a key
 
