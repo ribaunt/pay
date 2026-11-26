@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createHmac } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   PayClient,
   PayError,
@@ -133,6 +134,35 @@ describe("PayClient", () => {
     await client.me();
 
     assert.equal(sessionHeaders.get("cookie"), "pay_session=session-cookie; pay_csrf=csrf-cookie");
+  });
+});
+
+describe("API contract", () => {
+  it("covers every endpoint the client calls", () => {
+    const spec = JSON.parse(
+      readFileSync(new URL("../../../public/openapi.json", import.meta.url), "utf8")
+    ) as { paths: Record<string, unknown> };
+    for (const path of [
+      "/api/auth/csrf",
+      "/api/auth/login",
+      "/api/auth/me",
+      "/api/auth/logout",
+      "/api/payment-links",
+      "/api/payment-links/{id}/status",
+      "/api/payment-links/{id}/cancel",
+      "/api/payment-links/{id}/renew",
+      "/api/prices/quote",
+      "/api/prices/currencies",
+      "/api/public/payment-proofs/verify",
+      "/api/webhooks",
+      "/api/wallet/audit",
+      "/api/metrics",
+      "/api/events",
+      "/api/admin/attestations",
+      "/api/admin/stores",
+    ]) {
+      assert.ok(spec.paths[path], `${path} is missing from openapi.json`);
+    }
   });
 });
 

@@ -8,6 +8,7 @@ import io
 import json
 import unittest
 import urllib.error
+from pathlib import Path
 from email.message import Message
 from unittest.mock import patch
 
@@ -119,6 +120,32 @@ class PayClientTests(unittest.TestCase):
 
         self.assertEqual(events, [("payment.update", {"id": "link-1"})])
         self.assertEqual(urlopen.call_args[0][0].headers["X-status-token"], "secret-token")
+
+
+class ContractTests(unittest.TestCase):
+    def test_every_client_endpoint_is_in_the_openapi_spec(self):
+        spec_path = Path(__file__).parents[2] / "public" / "openapi.json"
+        spec = json.loads(spec_path.read_text())
+        for path in [
+            "/api/auth/csrf",
+            "/api/auth/login",
+            "/api/auth/me",
+            "/api/auth/logout",
+            "/api/payment-links",
+            "/api/payment-links/{id}/status",
+            "/api/payment-links/{id}/cancel",
+            "/api/payment-links/{id}/renew",
+            "/api/prices/quote",
+            "/api/prices/currencies",
+            "/api/public/payment-proofs/verify",
+            "/api/webhooks",
+            "/api/wallet/audit",
+            "/api/metrics",
+            "/api/events",
+            "/api/admin/attestations",
+            "/api/admin/stores",
+        ]:
+            self.assertIn(path, spec["paths"], f"{path} is missing from openapi.json")
 
 
 class SignatureTests(unittest.TestCase):
