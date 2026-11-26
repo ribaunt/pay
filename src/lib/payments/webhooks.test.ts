@@ -43,7 +43,7 @@ const { prisma } = await import("@/lib/prisma");
 const { encryptSecret, WEBHOOK_SECRET_PURPOSE } = await import("@/lib/crypto");
 const { isPrivateIp, assertPublicUrl, resolvePublicAddress } = await import("@/lib/ssrf");
 const { request: httpsRequest } = await import("node:https");
-const { dispatchWebhooks, emitWebhook, registerWebhook } = await import("./webhooks");
+const { dispatchWebhooks, emitWebhook, normalizeEvents, registerWebhook } = await import("./webhooks");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -126,6 +126,25 @@ describe("registerWebhook", () => {
       "private address"
     );
   });
+
+  it("normalizes spaced event lists", async () => {
+    await registerWebhook({
+      url: "https://example.com/hook",
+      events: "payment.confirmed, payment.late",
+    });
+
+    const create = vi.mocked(prisma.webhookEndpoint.create).mock.calls[0][0] as {
+      data: { events: string };
+    };
+    expect(create.data.events).toBe("payment.confirmed,payment.late");
+  });
+
+  it("rejects unknown event names", async () => {
+    await expect(
+      registerWebhook({ url: "https://example.com/hook", events: "payment.typo" })
+    ).rejects.toThrow("Invalid webhook event");
+    expect(prisma.webhookEndpoint.create).not.toHaveBeenCalled();
+  });
 });
 
 describe("emitWebhook", () => {
@@ -137,6 +156,19 @@ describe("emitWebhook", () => {
 
     expect(await emitWebhook("payment.confirmed", { id: "link-1" })).toBe(2);
     expect(prisma.webhookDelivery.createMany).toHaveBeenCalled();
+  });
+
+  it("matches legacy event lists that contain spaces", async () => {
+    vi.mocked(prisma.webhookEndpoint.findMany).mockResolvedValue([
+      { id: "e1", events: "payment.confirmed, payment.late", enabled: true },
+    ] as never);
+
+    expect(await emitWebhook("payment.late", { id: "link-1" })).toBe(1);
+  });
+
+  it("defaults a blank list to all events", async () => {
+    expect(normalizeEvents("")).toBe("*");
+    expect(normalizeEvents(undefined)).toBe("*");
   });
 });
 

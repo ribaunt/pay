@@ -18,6 +18,20 @@ export const WEBHOOK_EVENTS = [
   "payment.renewed",
 ] as const;
 
+const EVENT_NAMES = new Set<string>(WEBHOOK_EVENTS);
+
+/** Normalize a comma-separated event list and reject unknown names. */
+export function normalizeEvents(raw?: string): string {
+  const value = raw?.trim();
+  if (!value || value === "*") return "*";
+
+  const events = value.split(",").map((item) => item.trim());
+  for (const event of events) {
+    if (!EVENT_NAMES.has(event)) throw new Error(`Invalid webhook event: ${event || "(empty)"}`);
+  }
+  return events.join(",");
+}
+
 function loadWebhookSecret(value: string, endpointId: string): string {
   return value.startsWith("v1.") || value.startsWith("v2.")
     ? decryptSecret(value, WEBHOOK_SECRET_PURPOSE, endpointId)
@@ -33,7 +47,7 @@ export async function registerWebhook(options: {
   const target = assertPublicUrl(options.url);
   await resolvePublicAddress(target.hostname);
 
-  const events = options.events?.trim() || "*";
+  const events = normalizeEvents(options.events);
   const secret = `whsec_${randomBytes(24).toString("base64url")}`;
   const endpointId = randomUUID();
 
@@ -67,7 +81,9 @@ export async function emitWebhook(event: string, payload: Record<string, unknown
   const body = JSON.stringify({ event, createdAt: new Date().toISOString(), data: payload });
 
   const matching = endpoints.filter(
-    (endpoint) => endpoint.events === "*" || endpoint.events.split(",").includes(event)
+    (endpoint) =>
+      endpoint.events === "*" ||
+      endpoint.events.split(",").some((name) => name.trim() === event)
   );
 
   if (matching.length === 0) return 0;
