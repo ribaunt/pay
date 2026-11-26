@@ -167,4 +167,4 @@ curl -X POST https://pay.example.com/api/cron/payment-links \
 # {"processed": 12}
 ```
 
-The pass expires unpaid links, matches incoming transfers, updates confirmations and statuses, and queues webhook events. The appliance runs this automatically every **30 seconds** by default (`CRON_INTERVAL_SECONDS`); modular deployments should schedule it externally. Lower intervals improve detection latency but increase wallet RPC and database load.
+The pass expires unpaid links, matches incoming transfers, updates confirmations and statuses, and queues webhook events. Only one pass runs at a time across replicas; an overlapping call returns `{"processed": 0, "skipped": true}` instead of duplicating events. The appliance runs this automatically every **30 seconds** by default (`CRON_INTERVAL_SECONDS`); modular deployments should schedule it externally. Lower intervals improve detection latency but increase wallet RPC and database load.

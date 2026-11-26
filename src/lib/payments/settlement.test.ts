@@ -8,6 +8,9 @@ await vi.mock(new URL("./webhooks", import.meta.url).href, () => ({ emitWebhook:
 
 await vi.mock("@/lib/prisma", () => ({
   prisma: {
+    $transaction: vi.fn(async (fn: (client: unknown) => Promise<unknown>) =>
+      fn({ $queryRaw: vi.fn(async () => [{ locked: true }]) })
+    ),
     paymentRequest: {
       findMany: vi.fn(),
       update: vi.fn(),
@@ -21,7 +24,7 @@ await vi.mock("@/lib/prisma", () => ({
     },
     wallet: {
       findUnique: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -59,11 +62,10 @@ function request(overrides: Record<string, unknown>) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getWalletHeight).mockResolvedValue(1000);
-  vi.mocked(prisma.paymentRequest.update).mockResolvedValue({} as never);
   vi.mocked(prisma.paymentRequest.updateMany).mockResolvedValue({ count: 1 });
   vi.mocked(prisma.paymentRequestTransfer.upsert).mockResolvedValue({} as never);
   vi.mocked(prisma.wallet.findUnique).mockResolvedValue({ id: "wallet-1", settlementCursorHeight: 0 } as never);
-  vi.mocked(prisma.wallet.update).mockResolvedValue({} as never);
+  vi.mocked(prisma.wallet.updateMany).mockResolvedValue({ count: 1 } as never);
   vi.mocked(createPaymentRequestAtomic).mockResolvedValue({
     address: "8new",
     addressIndex: 2,
@@ -88,7 +90,7 @@ describe("settlePaymentLinks", () => {
     await settlePaymentLinks();
 
     expect(getTransfersSince).toHaveBeenCalledWith("single-user", 1000);
-    expect(prisma.wallet.update).not.toHaveBeenCalled();
+    expect(prisma.wallet.updateMany).not.toHaveBeenCalled();
   });
 
   it("skips database writes when nothing changed", async () => {
@@ -125,7 +127,7 @@ describe("settlePaymentLinks", () => {
     await settlePaymentLinks();
 
     expect(prisma.paymentRequestTransfer.upsert).not.toHaveBeenCalled();
-    expect(prisma.paymentRequest.update).not.toHaveBeenCalled();
+    expect(prisma.paymentRequest.updateMany).not.toHaveBeenCalled();
     expect(emitWebhook).not.toHaveBeenCalled();
   });
 
@@ -164,8 +166,8 @@ describe("settlePaymentLinks", () => {
     const result = await settlePaymentLinks();
 
     expect(result.processed).toBe(1);
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith({
-      where: { id: "expired-1" },
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: "expired-1", status: "pending" },
       data: { status: "expired" },
     });
     const [event, data] = vi.mocked(emitWebhook).mock.calls[0];
@@ -190,9 +192,9 @@ describe("settlePaymentLinks", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "detect-1" },
+        where: { id: "detect-1", status: "pending" },
         data: expect.objectContaining({ status: "detected", txHash: "tx-2", confirmations: 0 }),
       })
     );
@@ -208,7 +210,7 @@ describe("settlePaymentLinks", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "confirmed", confirmations: 0 }),
       })
@@ -225,7 +227,7 @@ describe("settlePaymentLinks", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "confirming", confirmations: 6 }),
       })
@@ -242,7 +244,7 @@ describe("settlePaymentLinks", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "confirmed", confirmations: 11 }),
       })
@@ -260,7 +262,7 @@ describe("settlePaymentLinks", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: "overpaid",
@@ -281,7 +283,7 @@ describe("settlePaymentLinks", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "late", txHash: "tx-5" }),
       })
@@ -298,11 +300,55 @@ describe("settlePaymentLinks", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "late", confirmations: 11 }),
       })
     );
+  });
+
+  it("skips the pass when another sweep holds the advisory lock", async () => {
+    vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: (client: unknown) => Promise<unknown>) =>
+      fn({ $queryRaw: vi.fn(async () => [{ locked: false }]) })
+    );
+
+    const result = await settlePaymentLinks();
+
+    expect(result).toEqual({ processed: 0, skipped: true });
+    expect(prisma.paymentRequest.findMany).not.toHaveBeenCalled();
+  });
+
+  it("fails the pass without writing state when wallet height is unavailable", async () => {
+    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+      request({ id: "height-1", address: "addr-height", status: "detected" }),
+    ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([
+      { txHash: "tx-height", address: "addr-height", blockHeight: 990, amountXmr: "0.1", type: "in", timestamp: now.toISOString() },
+    ] as never);
+    vi.mocked(getWalletHeight).mockRejectedValueOnce(new Error("RPC timeout"));
+
+    await expect(settlePaymentLinks()).rejects.toThrow("RPC timeout");
+    expect(prisma.paymentRequest.updateMany).not.toHaveBeenCalled();
+    expect(emitWebhook).not.toHaveBeenCalled();
+  });
+
+  it("advances the scan cursor only if it is still behind", async () => {
+    vi.mocked(prisma.wallet.findUnique).mockResolvedValue({
+      id: "wallet-1",
+      settlementCursorHeight: 100,
+    } as never);
+    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+      request({ id: "cursor-2", address: "addr-cursor-2" }),
+    ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([]);
+    vi.mocked(getWalletHeight).mockResolvedValue(200);
+
+    await settlePaymentLinks();
+
+    expect(prisma.wallet.updateMany).toHaveBeenCalledWith({
+      where: { id: "wallet-1", settlementCursorHeight: { lt: 190 } },
+      data: { settlementCursorHeight: 190 },
+    });
   });
 });
 
@@ -373,7 +419,7 @@ describe("partial payments", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: "confirming",
@@ -394,7 +440,7 @@ describe("partial payments", () => {
 
     await settlePaymentLinks();
 
-    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "underpaid", receivedAtomic: "40000000000" }),
       })

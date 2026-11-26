@@ -387,10 +387,23 @@ export async function listPaymentLinks(status?: string, storeId?: string | null)
   return records.map(paymentLinkView);
 }
 
+// A single sweep at a time across replicas. The advisory lock is released if
+// the process crashes, and pg_try_advisory_xact_lock avoids queuing cron runs.
+const SETTLEMENT_LOCK_ID = 738_192_653;
+
 export async function settlePaymentLinks() {
   const started = process.hrtime.bigint();
   try {
-    return await settlePaymentLinksInner();
+    return await prisma.$transaction(
+      async (tx) => {
+        const locked = await tx.$queryRaw<Array<{ locked: boolean }>>`
+          SELECT pg_try_advisory_xact_lock(${SETTLEMENT_LOCK_ID}) AS locked
+        `;
+        if (!locked[0]?.locked) return { processed: 0, skipped: true };
+        return settlePaymentLinksInner();
+      },
+      { maxWait: 10_000, timeout: 120_000 }
+    );
   } finally {
     observe(
       "pay_settlement_duration_seconds",
@@ -444,7 +457,9 @@ async function settlePaymentLinksInner() {
     : Math.min(wallet?.settlementCursorHeight ?? 0, oldestActiveBlock);
 
   const transfers = await getTransfersSince(SINGLE_USER_ID, cursor);
-  const height = await getWalletHeight().catch(() => 0);
+  // Missing height means no reliable confirmation state; fail the pass instead
+  // of writing a zero-confirmation regression.
+  const height = await getWalletHeight();
 
   for (const request of active) {
     const seen = new Set<string>();
@@ -529,10 +544,13 @@ async function settlePaymentLinksInner() {
         return current !== next;
       });
       if (changed) {
-        await prisma.paymentRequest.update({
-          where: { id: request.id },
+        // Guard on the observed status so a concurrent writer cannot be
+        // overwritten with this pass's stale snapshot.
+        const updated = await prisma.paymentRequest.updateMany({
+          where: { id: request.id, status: request.status },
           data,
         });
+        if (updated.count === 0) continue;
       }
 
       if (!request.txHash) await markSubaddressUsed(request.walletId, request.address);
@@ -555,11 +573,13 @@ async function settlePaymentLinksInner() {
     }
 
     if (request.status === "pending" && isExpired(request.expiresAt)) {
-      await prisma.paymentRequest.update({
-        where: { id: request.id },
+      const expired = await prisma.paymentRequest.updateMany({
+        where: { id: request.id, status: "pending" },
         data: { status: "expired" },
       });
-      await emit("payment.expired", paymentEventData({ ...request, status: "expired" }));
+      if (expired.count > 0) {
+        await emit("payment.expired", paymentEventData({ ...request, status: "expired" }));
+      }
     }
   }
 
@@ -568,8 +588,8 @@ async function settlePaymentLinksInner() {
   const nextCursor = Math.max(cursor, height > 0 ? height - 10 : 0);
   if (wallet && nextCursor > wallet.settlementCursorHeight) {
     await prisma.wallet
-      .update({
-        where: { id: wallet.id },
+      .updateMany({
+        where: { id: wallet.id, settlementCursorHeight: { lt: nextCursor } },
         data: { settlementCursorHeight: nextCursor },
       })
       .catch(() => {});
