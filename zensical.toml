@@ -35,6 +35,7 @@ nav = [
     { "Grafana" = "guides/grafana.md" },
     { "Releases" = "guides/releases.md" },
     { "Development" = "guides/development.md" },
+    { "Client libraries" = "guides/client-libraries.md" },
   ] },
   { "How it works" = [
     "architecture/index.md",
