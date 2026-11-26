@@ -1,4 +1,5 @@
 const { beforeEach, describe, expect, it, vi } = await import("@/testkit");
+const { Prisma } = await import("@prisma/client");
 
 await vi.mock("@/lib/auth", () => ({
   SINGLE_USER_ID: "single-user",
@@ -276,6 +277,28 @@ describe("settlePaymentLinks", () => {
     expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "confirmed", confirmations: 11 }),
+      })
+    );
+  });
+
+  it("sums multiple outputs of one transaction", async () => {
+    useLinks([request({ id: "outputs-1", address: "addr-outputs", status: "detected" })] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([
+      { txHash: "tx-out", address: "addr-outputs", blockHeight: 995, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
+      { txHash: "tx-out", address: "addr-outputs", blockHeight: 995, amountXmr: "0.06", type: "in", timestamp: now.toISOString() },
+    ] as never);
+
+    await settlePaymentLinks();
+
+    expect(prisma.paymentRequestTransfer.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.paymentRequestTransfer.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ txid: "tx-out", amount: "100000000000" }),
+      })
+    );
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ receivedAtomic: "100000000000" }),
       })
     );
   });
@@ -592,6 +615,29 @@ describe("renewPaymentLink", () => {
       where: { id: "expired-link", storeId: "store-a" },
     });
     expect(prisma.paymentRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a second renewal from the same link", async () => {
+    vi.mocked(prisma.paymentRequest.findFirst).mockResolvedValue({
+      id: "expired-link",
+      status: "expired",
+      txHash: null,
+      paidAt: null,
+      amount: "100000000000",
+      fiatAmount: null,
+      fiatCurrency: null,
+      requiredConfirmations: null,
+      apiKeyId: null,
+    } as never);
+    vi.mocked(prisma.paymentRequest.create).mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      })
+    );
+
+    await expect(renewPaymentLink("expired-link")).rejects.toThrow(ConflictError);
+    expect(emitWebhook).not.toHaveBeenCalled();
   });
 });
 

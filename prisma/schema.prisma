@@ -158,6 +158,7 @@ model PaymentRequest {
 
   transfers PaymentRequestTransfer[]
 
+  @@unique([renewedFromId])
   @@unique([apiKeyId, idempotencyKeyHash])
   @@index([walletId, status])
   @@index([status, expiresAt])

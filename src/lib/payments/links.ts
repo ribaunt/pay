@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { ConflictError, NotFoundError } from "@/lib/api-response";
 import { getPaymentConfig } from "@/lib/config";
@@ -346,25 +347,35 @@ export async function renewPaymentLink(id: string, storeId?: string | null) {
   const token = randomBytes(32).toString("base64url");
   const { expiresAt } = resolvePaymentTimeout(undefined);
 
-  const record = await prisma.paymentRequest.create({
-    data: {
-      walletId: wallet.id,
-      address: request.address,
-      amount: request.amountAtomic,
-      uri: request.uri,
-      label: previous.label,
-      expiresAt,
-      publicTokenHash: hashToken(token),
-      fiatAmount: previous.fiatAmount,
-      fiatCurrency: previous.fiatCurrency,
-      ...quoteData,
-      requiredConfirmations: previous.requiredConfirmations,
-      zeroConf: previous.zeroConf,
-      renewedFromId: previous.id,
-      apiKeyId: previous.apiKeyId,
-      storeId: previous.storeId,
-    },
-  });
+  let record;
+  try {
+    // The unique renewedFromId index makes concurrent renewals safe: only one
+    // replacement can be created from a given expired link.
+    record = await prisma.paymentRequest.create({
+      data: {
+        walletId: wallet.id,
+        address: request.address,
+        amount: request.amountAtomic,
+        uri: request.uri,
+        label: previous.label,
+        expiresAt,
+        publicTokenHash: hashToken(token),
+        fiatAmount: previous.fiatAmount,
+        fiatCurrency: previous.fiatCurrency,
+        ...quoteData,
+        requiredConfirmations: previous.requiredConfirmations,
+        zeroConf: previous.zeroConf,
+        renewedFromId: previous.id,
+        apiKeyId: previous.apiKeyId,
+        storeId: previous.storeId,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ConflictError("Payment has already been renewed");
+    }
+    throw error;
+  }
 
   await emit("payment.renewed", paymentEventData(record, { fromId: previous.id }));
 
@@ -463,7 +474,6 @@ async function settlePaymentLinksInner() {
   const height = await getWalletHeight();
 
   for (const request of active) {
-    const seen = new Set<string>();
     // Prefer the invoice subaddress. A transaction can also return change to
     // the primary address; matching by txHash alone would count that change
     // toward the payment.
@@ -472,44 +482,61 @@ async function settlePaymentLinksInner() {
       addressMatches.length > 0
         ? addressMatches
         : transfers.filter((transfer) => transfer.txHash === request.txHash);
-    const candidates = matched.filter((transfer) => {
-      if (seen.has(transfer.txHash)) return false;
-      seen.add(transfer.txHash);
-      return true;
-    });
+
+    // One transaction can pay the same subaddress with several outputs. Store
+    // one row per txid with the summed amount.
+    const grouped = new Map<
+      string,
+      { txHash: string; address: string; blockHeight: number; amountAtomic: bigint }
+    >();
+    for (const transfer of matched) {
+      if (!transfer.txHash || !transfer.address) continue;
+      const amountAtomic = xmrToAtomic(transfer.amountXmr);
+      const current = grouped.get(transfer.txHash);
+      if (current) {
+        current.amountAtomic += amountAtomic;
+        current.blockHeight = Math.max(current.blockHeight, transfer.blockHeight);
+      } else {
+        grouped.set(transfer.txHash, {
+          txHash: transfer.txHash,
+          address: transfer.address,
+          blockHeight: transfer.blockHeight,
+          amountAtomic,
+        });
+      }
+    }
+    const candidates = [...grouped.values()];
 
     if (candidates.length > 0) {
-      for (const transfer of candidates) {
-        const amountAtomic = xmrToAtomic(transfer.amountXmr).toString();
-        const existing = (request.transfers ?? []).find((row) => row.txid === transfer.txHash);
+      for (const candidate of candidates) {
+        const amountAtomic = candidate.amountAtomic.toString();
+        const existing = (request.transfers ?? []).find((row) => row.txid === candidate.txHash);
 
         // At 30s intervals a no-op upsert on every sweep is pure database churn.
         if (
           existing &&
           existing.amount === amountAtomic &&
-          existing.blockHeight === transfer.blockHeight
+          existing.blockHeight === candidate.blockHeight
         ) {
           continue;
         }
 
         await prisma.paymentRequestTransfer.upsert({
           where: {
-            paymentRequestId_txid: { paymentRequestId: request.id, txid: transfer.txHash },
+            paymentRequestId_txid: { paymentRequestId: request.id, txid: candidate.txHash },
           },
-          update: { blockHeight: transfer.blockHeight, amount: amountAtomic },
+          update: { blockHeight: candidate.blockHeight, amount: amountAtomic },
           create: {
             paymentRequestId: request.id,
-            txid: transfer.txHash,
+            txid: candidate.txHash,
             amount: amountAtomic,
-            blockHeight: transfer.blockHeight,
+            blockHeight: candidate.blockHeight,
           },
         });
       }
 
       const expected = BigInt(request.amount);
-      const received = candidates.reduce((sum, transfer) => {
-        return sum + xmrToAtomic(transfer.amountXmr);
-      }, 0n);
+      const received = candidates.reduce((sum, candidate) => sum + candidate.amountAtomic, 0n);
       const highestBlock = Math.max(0, ...candidates.map((transfer) => transfer.blockHeight));
       const confirmations = highestBlock > 0 && height > 0 ? height - highestBlock + 1 : 0;
       const required = request.requiredConfirmations ?? defaultConfirmations;
