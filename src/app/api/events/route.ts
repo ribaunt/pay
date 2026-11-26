@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { apiError } from "@/lib/api-response";
 import { clientId, rateLimit } from "@/lib/rate-limit";
 import { requireUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { verifyApiKey } from "@/lib/payments/auth";
 import { getPaymentLinkStatus, listPaymentLinks } from "@/lib/payments/links";
 import { paymentLinkView } from "@/lib/api/serialize";
@@ -45,23 +46,30 @@ export async function GET(request: Request) {
   // browser history or Referer headers.
   const token = request.headers.get("x-status-token");
 
-  if (linkId && token) {
-    const status = await getPaymentLinkStatus(linkId, token);
-    if (!status) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  } else {
-    const key = await verifyApiKey(request, "payment:read");
-    if (!key) {
-      try {
-        await requireUser();
-      } catch {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let key: Awaited<ReturnType<typeof verifyApiKey>> = null;
+  try {
+    if (linkId && token) {
+      const status = await getPaymentLinkStatus(linkId, token);
+      if (!status) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      // Hash the bearer token so the bucket key never holds the secret itself.
+      const bucket = createHash("sha256").update(`${linkId}:${token}`).digest("hex");
+      await rateLimit(`events-status:${bucket}`, 10, 60_000);
+    } else {
+      key = await verifyApiKey(request, "payment:read");
+      if (!key) {
+        try {
+          await requireUser();
+        } catch {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
       }
+      await rateLimit(`events:${clientId(request)}`, 60, 60_000);
     }
-    await rateLimit(`events:${clientId(request)}`, 60, 60_000);
+  } catch (error) {
+    return apiError(error, "Failed to start event stream");
   }
 
   const encoder = new TextEncoder();
-  const key = linkId ? null : await verifyApiKey(request, "payment:read");
   let last = new Map<string, Snapshot>();
   let ticks = 0;
 

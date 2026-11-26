@@ -67,6 +67,11 @@ Limits are stored in PostgreSQL, so they apply across replicas and survive resta
 | `POST /api/public/payment-proofs/verify` | 30 | Client |
 | Admin API keys | 10 (create) / 60 (list) | Client |
 | `GET /api/metrics` | 60 | API key ID or client |
+| `GET /api/events` (status token) | 10 stream starts | Hash of link ID and status token |
+| `GET /api/events` (key or session) | 60 stream starts | API key ID or client |
+
+!!! note "Event streams"
+    The `GET /api/events` limits count new stream connections, not messages. A stream can still run for up to five minutes once opened.
 
 !!! note "Client identity"
     Without `TRUST_PROXY=1`, every unauthenticated request shares the bucket `local`. Set it only when a trusted proxy overwrites `X-Forwarded-For`; otherwise a client can spoof that header.
