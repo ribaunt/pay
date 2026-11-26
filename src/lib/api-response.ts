@@ -35,5 +35,9 @@ export function apiError(error: unknown, fallback = "Request failed") {
         : "Internal server error"
       : message;
 
-  return NextResponse.json({ error: safeMessage }, { status });
+  const response = NextResponse.json({ error: safeMessage }, { status });
+  if (error instanceof RateLimitError) {
+    response.headers.set("Retry-After", String(error.retryAfterSeconds));
+  }
+  return response;
 }

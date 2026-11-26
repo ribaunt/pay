@@ -3,7 +3,7 @@ import { prisma } from "./prisma";
 import { inc } from "./metrics";
 
 export class RateLimitError extends Error {
-  constructor() {
+  constructor(public readonly retryAfterSeconds: number) {
     super("Too many requests");
     this.name = "RateLimitError";
   }
@@ -44,7 +44,7 @@ export async function rateLimit(key: string, limit: number, windowMs: number): P
   if (reset.count > 0) return;
 
   inc("pay_rate_limit_hits_total", { route: key.split(":")[0] ?? "unknown" });
-  throw new RateLimitError();
+  throw new RateLimitError(Math.ceil(windowMs / 1000));
 }
 
 /**

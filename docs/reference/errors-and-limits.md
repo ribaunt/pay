@@ -48,7 +48,7 @@ The mapping is centralized in `apiError()`: auth errors become `401`, conflicts 
 
 ## Rate limits
 
-Limits are stored in PostgreSQL, so they apply across replicas and survive restarts. Buckets reset after 60 seconds.
+Limits are stored in PostgreSQL, so they apply across replicas and survive restarts. Buckets reset after 60 seconds. A `429` response includes a `Retry-After` header with the wait time in seconds.
 
 | Route | Limit | Bucket key |
 | --- | --- | --- |

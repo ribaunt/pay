@@ -75,6 +75,12 @@ describe("rateLimit", () => {
     await expect(rateLimit("k", 1, 60_000)).rejects.toThrow(RateLimitError);
   });
 
+  it("carries a retry hint in seconds", async () => {
+    await rateLimit("k", 1, 90_000);
+    const error = await rateLimit("k", 1, 90_000).catch((cause: unknown) => cause);
+    expect(error).toHaveProperty("retryAfterSeconds", 90);
+  });
+
   it("resets after the window", async () => {
     const buckets = useStore();
     buckets.set("k", { count: 99, resetAt: Date.now() - 1000 });
