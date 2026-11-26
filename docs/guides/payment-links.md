@@ -99,14 +99,14 @@ A wrong or missing token returns `404`, which keeps the link's existence private
 | `detected` | A transfer was seen in the mempool or at block height 0. |
 | `confirming` | In a block, with fewer confirmations than required. |
 | `confirmed` | Enough confirmations. This is the usual success state. |
-| `underpaid` | The received amount is below the requested amount. More transfers can top it up. |
+| `underpaid` | The received amount is below the requested amount. More transfers can top it up; at the deadline it becomes `expired` or `late`. |
 | `overpaid` | More than requested was received; still waiting for confirmations. |
 | `late` | Payment arrived after expiry. Confirmations keep updating, but it is never auto-refunded. |
 | `expired` | No transaction before the expiry time. |
 | `cancelled` | Cancelled by the merchant before any transaction was seen. |
 
 !!! note "Waiting for settlement"
-    Nothing changes status by itself. Run `POST /api/cron/payment-links` with `x-cron-secret` on a schedule. The settlement pass processes up to 200 active links at a time.
+    Nothing changes status by itself. Run `POST /api/cron/payment-links` with `x-cron-secret` on a schedule. Each pass handles up to 200 active links, serving links that still need first detection before historical links.
 
 ## Idempotency
 

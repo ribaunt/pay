@@ -59,6 +59,13 @@ function request(overrides: Record<string, unknown>) {
   };
 }
 
+/** First query returns unfinished links, second returns historical links. */
+function useLinks(links: unknown[]) {
+  vi.mocked(prisma.paymentRequest.findMany)
+    .mockResolvedValueOnce(links as never)
+    .mockResolvedValue([] as never);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getWalletHeight).mockResolvedValue(1000);
@@ -81,7 +88,7 @@ describe("settlePaymentLinks", () => {
       id: "wallet-1",
       settlementCursorHeight: 1000,
     } as never);
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "cursor-1", address: "addr-cursor" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([]);
@@ -93,8 +100,30 @@ describe("settlePaymentLinks", () => {
     expect(prisma.wallet.updateMany).not.toHaveBeenCalled();
   });
 
+  it("serves unfinished links before historical ones", async () => {
+    vi.mocked(prisma.paymentRequest.findMany)
+      .mockResolvedValueOnce([request({ id: "fresh", address: "addr-fresh" })] as never)
+      .mockResolvedValueOnce([
+        request({ id: "old", address: "addr-old", status: "late" }),
+      ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([]);
+
+    const result = await settlePaymentLinks();
+
+    expect(result.processed).toBe(2);
+    const calls = vi.mocked(prisma.paymentRequest.findMany).mock.calls;
+    expect(calls[0][0]).toMatchObject({
+      where: { status: { in: ["pending", "detected", "confirming"] } },
+      take: 200,
+    });
+    expect(calls[1][0]).toMatchObject({
+      where: { status: { in: ["expired", "late", "underpaid", "overpaid"] } },
+      take: 199,
+    });
+  });
+
   it("skips database writes when nothing changed", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({
         id: "noop-1",
         address: "addr-noop",
@@ -132,7 +161,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("emits a canonical webhook payload on status transitions", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "hook-1", address: "addr-hook", status: "detected" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -158,7 +187,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("expires an unpaid pending link", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "expired-1", status: "pending", expiresAt: new Date(now.getTime() - 1000) }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([]);
@@ -183,7 +212,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("detects a pooled payment", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "detect-1", address: "addr-2" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -201,7 +230,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("confirms a covered zero-conf payment in the mempool", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "zero-1", address: "addr-zero", status: "detected", zeroConf: true }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -218,7 +247,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("marks a mostly confirmed payment as confirming", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "confirm-1", address: "addr-3", status: "detected" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -235,7 +264,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("confirms a payment with enough confirmations", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "confirmed-1", address: "addr-4", status: "confirming" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -252,7 +281,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("sums multiple transfers and marks an overpayment", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "dup-1", address: "addr-dup", status: "detected" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -274,7 +303,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("marks a late payment after expiry", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "late-1", address: "addr-5", status: "expired", expiresAt: new Date(now.getTime() - 1000) }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -291,7 +320,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("keeps tracking confirmations for an already late payment", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "late-2", address: "addr-late", status: "late", txHash: "tx-late" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -319,7 +348,7 @@ describe("settlePaymentLinks", () => {
   });
 
   it("fails the pass without writing state when wallet height is unavailable", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "height-1", address: "addr-height", status: "detected" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -337,7 +366,7 @@ describe("settlePaymentLinks", () => {
       id: "wallet-1",
       settlementCursorHeight: 100,
     } as never);
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "cursor-2", address: "addr-cursor-2" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([]);
@@ -404,7 +433,7 @@ describe("cancelPaymentLink", () => {
 
 describe("partial payments", () => {
   it("recovers from an underpayment after a top-up", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({
         id: "topup-1",
         address: "addr-topup",
@@ -431,7 +460,7 @@ describe("partial payments", () => {
   });
 
   it("marks an underpayment and stores the received amount", async () => {
-    vi.mocked(prisma.paymentRequest.findMany).mockResolvedValue([
+    useLinks([
       request({ id: "partial-1", address: "addr-partial", status: "pending" }),
     ] as never);
     vi.mocked(getTransfersSince).mockResolvedValue([
@@ -443,6 +472,50 @@ describe("partial payments", () => {
     expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "underpaid", receivedAtomic: "40000000000" }),
+      })
+    );
+  });
+
+  it("expires an underpaid link at its deadline", async () => {
+    useLinks([
+      request({
+        id: "underpaid-expired",
+        status: "underpaid",
+        txHash: "tx-partial",
+        expiresAt: new Date(now.getTime() - 1000),
+      }),
+    ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([]);
+
+    const result = await settlePaymentLinks();
+
+    expect(result.processed).toBe(1);
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: "underpaid-expired", status: "underpaid" },
+      data: { status: "expired" },
+    });
+  });
+
+  it("moves a partially paid link past its deadline to late", async () => {
+    useLinks([
+      request({
+        id: "underpaid-late",
+        address: "addr-underpaid",
+        status: "underpaid",
+        txHash: "tx-partial",
+        expiresAt: new Date(now.getTime() - 1000),
+      }),
+    ] as never);
+    vi.mocked(getTransfersSince).mockResolvedValue([
+      { txHash: "tx-partial", address: "addr-underpaid", blockHeight: 990, amountXmr: "0.04", type: "in", timestamp: now.toISOString() },
+    ] as never);
+
+    await settlePaymentLinks();
+
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "underpaid-late", status: "underpaid" },
+        data: expect.objectContaining({ status: "late", receivedAtomic: "40000000000" }),
       })
     );
   });

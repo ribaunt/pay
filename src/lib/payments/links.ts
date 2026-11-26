@@ -416,23 +416,24 @@ export async function settlePaymentLinks() {
 async function settlePaymentLinksInner() {
   const defaultConfirmations = getPaymentConfig().requiredConfirmations;
 
-  const active = await prisma.paymentRequest.findMany({
-    where: {
-      status: {
-        in: [
-          "pending",
-          "detected",
-          "confirming",
-          "expired",
-          "late",
-          "underpaid",
-          "overpaid",
-        ],
-      },
-    },
+  // Serve links that still need a first detection before spending the pass on
+  // historical rows that only need confirmation updates.
+  const unfinished = await prisma.paymentRequest.findMany({
+    where: { status: { in: ["pending", "detected", "confirming"] } },
+    orderBy: { createdAt: "asc" },
     take: 200,
     include: { transfers: true },
   });
+  const historical =
+    unfinished.length < 200
+      ? await prisma.paymentRequest.findMany({
+          where: { status: { in: ["expired", "late", "underpaid", "overpaid"] } },
+          orderBy: { createdAt: "asc" },
+          take: 200 - unfinished.length,
+          include: { transfers: true },
+        })
+      : [];
+  const active = [...unfinished, ...historical];
   if (active.length === 0) return { processed: 0 };
 
   const wallet = await prisma.wallet.findUnique({
@@ -512,7 +513,10 @@ async function settlePaymentLinksInner() {
       const highestBlock = Math.max(0, ...candidates.map((transfer) => transfer.blockHeight));
       const confirmations = highestBlock > 0 && height > 0 ? height - highestBlock + 1 : 0;
       const required = request.requiredConfirmations ?? defaultConfirmations;
-      const isLate = request.status === "expired" || request.status === "late";
+      const isLate =
+        request.status === "expired" ||
+        request.status === "late" ||
+        (request.status === "underpaid" && isExpired(request.expiresAt));
 
       const covered = received >= expected;
       let status: string;
@@ -572,9 +576,12 @@ async function settlePaymentLinksInner() {
       continue;
     }
 
-    if (request.status === "pending" && isExpired(request.expiresAt)) {
+    if (
+      (request.status === "pending" || request.status === "underpaid") &&
+      isExpired(request.expiresAt)
+    ) {
       const expired = await prisma.paymentRequest.updateMany({
-        where: { id: request.id, status: "pending" },
+        where: { id: request.id, status: request.status },
         data: { status: "expired" },
       });
       if (expired.count > 0) {
