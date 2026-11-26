@@ -56,6 +56,23 @@ async function main() {
   }).then((r) => r.json());
   assert(status.status === "pending", "public status endpoint reads pending link");
 
+  const streamController = new AbortController();
+  try {
+    const stream = await fetch(`${APP}/api/events?linkId=${link.id}`, {
+      headers: { "x-status-token": link.statusToken },
+      signal: streamController.signal,
+    });
+    assert(stream.ok, "single-link event stream accepts the header token");
+    const reader = stream.body?.getReader();
+    const chunk = await reader?.read();
+    assert(
+      new TextDecoder().decode(chunk?.value).includes("event: payment.update"),
+      "event stream delivers a payment update"
+    );
+  } finally {
+    streamController.abort();
+  }
+
   const cancelled = await fetch(`${APP}/api/payment-links/${link.id}/cancel`, {
     method: "POST",
     headers: { cookie: cookieWithCsrf, origin: APP, "x-csrf-token": csrfToken },
